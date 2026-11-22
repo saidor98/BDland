@@ -31,11 +31,10 @@ jobs:
       - name: Check Flutter Version
         run: flutter --version
 
-      - name: Create or Update Android Configuration if needed
+      - name: Generate Clean Android Scaffold
         run: |
-          if [ ! -f "android/build.gradle" ] && [ ! -f "android/build.gradle.kts" ]; then
-            flutter create . --org com.bdlandpro.app --project-name bdland_pro --platforms=android
-          fi
+          rm -rf android
+          flutter create . --org com.bdlandpro.app --project-name bdland_pro --platforms=android
 
       - name: Install Dependencies
         run: flutter pub get
@@ -49,7 +48,7 @@ jobs:
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: BDLandPro-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30

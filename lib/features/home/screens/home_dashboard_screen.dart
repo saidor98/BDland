@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/bangla_formatter.dart';
-import '../../geometry/screens/geometry_hub_screen.dart';
-import '../../converter/screens/unit_converter_screen.dart';
-import '../../khatian/screens/khatian_calculator_screen.dart';
-import '../../faraiz/screens/faraiz_calculator_screen.dart';
-import '../../mouza_survey/screens/mouza_scale_screen.dart';
-import '../../mouza_survey/screens/survey_knowledge_screen.dart';
+import '../../../core/services/pinned_tools_service.dart';
 import '../../history/screens/history_screen.dart';
+import '../data/tools_data.dart';
+import '../models/tool_item.dart';
+import '../widgets/sidebar_drawer.dart';
+import '../widgets/tool_card.dart';
+import '../widgets/review_section.dart';
+import '../widgets/user_guide_view.dart';
+import '../../tools/24_surveyor_memo/surveyor_memo_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -17,240 +18,362 @@ class HomeDashboardScreen extends StatefulWidget {
 }
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
-  int _currentIndex = 0;
+  int _sidebarIndex = 0;
+  int _topTabIndex = 0; // 0: সকল টুলস, 1: পিন টুলস, 2: ব্যবহারবিধি
 
-  final List<Widget> _tabs = const [
-    _DashboardView(),
-    HistoryScreen(),
-    SurveyKnowledgeScreen(),
-  ];
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  Set<String> _pinnedToolIds = {};
+  bool _isLoadingPins = true;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _tabs[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-        indicatorColor: AppColors.primaryGreen.withOpacity(0.18),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard, color: AppColors.primaryGreen),
-            label: 'হোম ড্যাশবোর্ড',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history, color: AppColors.primaryGreen),
-            label: 'হিস্ট্রি',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book, color: AppColors.primaryGreen),
-            label: 'ভূমি নির্দেশিকা',
+  void initState() {
+    super.initState();
+    _loadPinnedTools();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPinnedTools() async {
+    final pinned = await PinnedToolsService.instance.getPinnedToolIds();
+    if (mounted) {
+      setState(() {
+        _pinnedToolIds = pinned;
+        _isLoadingPins = false;
+      });
+    }
+  }
+
+  Future<void> _togglePin(String toolId) async {
+    await PinnedToolsService.instance.togglePin(toolId);
+    setState(() {
+      if (_pinnedToolIds.contains(toolId)) {
+        _pinnedToolIds.remove(toolId);
+      } else {
+        _pinnedToolIds.add(toolId);
+      }
+    });
+  }
+
+  void _handleSidebarSelect(int index) {
+    setState(() => _sidebarIndex = index);
+    if (index == 0) {
+      // Home
+      setState(() => _topTabIndex = 0);
+    } else if (index == 1) {
+      // Tools
+      setState(() => _topTabIndex = 0);
+    } else if (index == 2) {
+      // Search
+      _searchFocusNode.requestFocus();
+    } else if (index == 3) {
+      // Tab / History
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const HistoryScreen()),
+      );
+    } else if (index == 4) {
+      // Post Job / Surveyor Memo
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SurveyorMemoScreen()),
+      );
+    } else if (index == 5) {
+      // Profile
+      _showProfileDialog();
+    }
+  }
+
+  void _showProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.person, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('সার্ভেয়ার প্রোফাইল'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.primaryGreen,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              title: Text('বিডি ল্যান্ড প্রো ইউজার', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('সার্টিফাইড ল্যান্ড সার্ভে ও খতিয়ান বিশারদ'),
+            ),
+            Divider(),
+            Text('• সংস্করণ: ১.০.০ (ওপেন সোর্স)'),
+            SizedBox(height: 4),
+            Text('• সকল ২৪টি টুল আনলকড ও অফলাইন প্রস্তুত'),
+            SizedBox(height: 4),
+            Text('• ডেটা স্টোরেজ: লোকাল ডিভাইস এনক্রিপ্টেড'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ঠিক আছে'),
           ),
         ],
       ),
     );
   }
-}
 
-class _DashboardView extends StatelessWidget {
-  const _DashboardView();
+  List<ToolItem> _getFilteredTools() {
+    List<ToolItem> list;
+    if (_topTabIndex == 1) {
+      list = ToolsData.allTools.where((t) => _pinnedToolIds.contains(t.id)).toList();
+    } else {
+      list = ToolsData.allTools;
+    }
+
+    if (_searchQuery.trim().isEmpty) {
+      return list;
+    }
+
+    final query = _searchQuery.trim().toLowerCase();
+    return list.where((tool) {
+      final inTitle = tool.title.toLowerCase().contains(query);
+      final inSub = tool.subtitle.toLowerCase().contains(query);
+      final inKeywords = tool.keywords.any((k) => k.toLowerCase().contains(query));
+      return inTitle || inSub || inKeywords;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('বিডি ল্যান্ড প্রো (BDLandPro)'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'পরিমাপের ইতিহাস',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HistoryScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Hero Banner
-            Container(
-              padding: const EdgeInsets.all(18.0),
-              decoration: BoxDecoration(
-                gradient: AppColors.greenHeaderGradient,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryGreen.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 900;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAF9),
+          appBar: isDesktop
+              ? null
+              : AppBar(
+                  backgroundColor: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0.5,
+                  title: const Text(
+                    'বিডি ল্যান্ড প্রো',
+                    style: TextStyle(
+                      color: AppColors.primaryGreen,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
-                ],
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.history, color: AppColors.primaryGreen),
+                      tooltip: 'পরিমাপের হিস্ট্রি',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+          drawer: isDesktop
+              ? null
+              : Drawer(
+                  child: SafeArea(
+                    child: SidebarDrawer(
+                      selectedIndex: _sidebarIndex,
+                      onItemSelected: (idx) {
+                        Navigator.pop(context);
+                        _handleSidebarSelect(idx);
+                      },
+                    ),
+                  ),
+                ),
+          body: Row(
+            children: [
+              if (isDesktop)
+                SidebarDrawer(
+                  selectedIndex: _sidebarIndex,
+                  onItemSelected: _handleSidebarSelect,
+                ),
+              Expanded(
+                child: _buildMainDashboard(constraints),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMainDashboard(BoxConstraints constraints) {
+    return SafeArea(
+      child: Column(
+        children: [
+          // Top Bar: Tabs & Search
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+              ),
+            ],
+            child: Column(
+              children: [
+                // Filter Tabs: সকল টুলস / পিন টুলস / ব্যবহারবিধি
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
+                          color: const Color(0xFFF1F5F2),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.offline_pin, color: Colors.white, size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              '১০০% অফলাইন সমর্থিত',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: _buildTopTabPill(
+                                icon: Icons.grid_view,
+                                label: 'সকল টুলস',
+                                index: 0,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildTopTabPill(
+                                icon: Icons.push_pin,
+                                label: 'পিন টুলস (${_pinnedToolIds.length})',
+                                index: 1,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildTopTabPill(
+                                icon: Icons.info_outline,
+                                label: 'ব্যবহারবিধি',
+                                index: 2,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Text(
-                        BanglaFormatter.formatDateTime(DateTime.now()).split(',')[0],
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'বাংলাদেশ ভূমি জরিপ ও পরিমাপ সহকারী',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'হেরন্স ফর্মুলায় নিখুঁত জমি পরিমাপ, খতিয়ানের ১৬ আনা অংশ বণ্টন, একক রূপান্তর ও পূর্ণাঙ্গ ফারায়েজ ক্যালকুলেটর।',
-                    style: TextStyle(fontSize: 13.5, color: Colors.white70, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Modules Grid
-            const Text(
-              'প্রধান মডিউল ও ক্যালকুলেটরসমূহ',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.95,
-              children: [
-                _buildFeatureCard(
-                  context: context,
-                  title: 'জমি ও জ্যামিতি পরিমাপ',
-                  subtitle: 'চতুর্ভুজ (হেরন্স বনাম গড়), ত্রিভুজ, ট্রাপিজিয়াম, বহুভুজ, পুকুর খনন',
-                  icon: Icons.architecture,
-                  iconColor: AppColors.primaryGreen,
-                  destination: const GeometryHubScreen(),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'একক রূপান্তরকারী',
-                  subtitle: 'শতক, কাঠা, বিঘা, একর, কানি, গণ্ডা, কড়া, ক্রান্তি, তিল, বর্গলিংক',
-                  icon: Icons.swap_horiz,
-                  iconColor: AppColors.secondaryGoldDark,
-                  destination: const UnitConverterScreen(),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'খতিয়ান ও আনা-গণ্ডা',
-                  subtitle: '১৬ আনা হিস্যা যোগ-বিয়োগ, প্রতীক ও দাগের অংশ বণ্টন টেবিল',
-                  icon: Icons.table_chart,
-                  iconColor: AppColors.accentTeal,
-                  destination: const KhatianCalculatorScreen(),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'মুসলিম ফারায়েজ ইঞ্জিন',
-                  subtitle: 'হানাফি আইনশাস্ত্র অনুযায়ী আসহাবে ফুরুজ, আসাবা, আওল ও রদ বণ্টন',
-                  icon: Icons.family_restroom,
-                  iconColor: AppColors.accentPurple,
-                  destination: const FaraizCalculatorScreen(),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'মৌজা ম্যাপ স্কেল',
-                  subtitle: '১৬", ৩২", ৬৪", ৮০" স্কেল ও গুনিয়া থেকে নকশার পরিমাপ',
-                  icon: Icons.map,
-                  iconColor: const Color(0xFF0284C7),
-                  destination: const MouzaScaleScreen(),
-                ),
-                _buildFeatureCard(
-                  context: context,
-                  title: 'ভূমি নির্দেশিকা ও আইন',
-                  subtitle: 'দলিল রেজিস্ট্রি খরচ, ই-নামজারি প্রক্রিয়া, খাজনা ও পরিভাষা',
-                  icon: Icons.menu_book,
-                  iconColor: AppColors.accentOrange,
-                  destination: const SurveyKnowledgeScreen(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Tip of the Day Card
-            Card(
-              color: AppColors.secondaryGoldLight,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppColors.secondaryGold),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Row(
-                      children: [
-                        Icon(Icons.lightbulb_outline, color: AppColors.secondaryGoldDark),
-                        SizedBox(width: 8),
-                        Text(
-                          'সার্ভেয়ার টিপস: কেন আমিনের গড় পদ্ধতি পরিহার করবেন?',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.secondaryGoldDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'অনিয়মিত চতুর্ভুজের ক্ষেত্রে উত্তর-দক্ষিণ এবং পূর্ব-পশ্চিমের বাহু গড় করে গুণ করলে অধিকাংশ ক্ষেত্রে জমির পরিমাণ বাস্তবে যা আছে তার চেয়ে বেশি দেখায়। ফলে সীমানা নির্ধারণ বা জমি বিক্রয়ে বিরোধ সৃষ্টি হয়। একটি কর্ণ মেপে জমিটিকে দুটি ত্রিভুজে ভাগ করে হেরন্স ফর্মুলায় পরিমাপ করাই একমাত্র আইনগত ও বিজ্ঞানসম্মত পদ্ধতি।',
-                      style: TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 10),
+
+                // Search Bar
+                if (_topTabIndex != 2)
+                  Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, size: 20, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            decoration: const InputDecoration(
+                              hintText: 'টুল বা হিসাবের নাম দিয়ে খুঁজুন (যেমন: মৌজা, ফারায়েজ, cad, khatian)...',
+                              hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            style: const TextStyle(fontSize: 13.5),
+                            onChanged: (val) {
+                              setState(() => _searchQuery = val);
+                            },
+                          ),
+                        ),
+                        if (_searchQuery.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            child: const Icon(Icons.close, size: 18, color: Colors.grey),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Body Content
+          Expanded(
+            child: _topTabIndex == 2
+                ? const UserGuideView()
+                : _buildToolsGridWithReviews(constraints),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopTabPill({
+    required IconData icon,
+    required String label,
+    required int index,
+  }) {
+    final isSelected = _topTabIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() => _topTabIndex = index);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? AppColors.primaryGreen : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? AppColors.primaryGreen : Colors.grey.shade700,
               ),
             ),
           ],
@@ -259,67 +382,98 @@ class _DashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureCard({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    required Widget destination,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.cardBorderLight),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => destination),
-          );
-        },
+  Widget _buildToolsGridWithReviews(BoxConstraints constraints) {
+    final filteredTools = _getFilteredTools();
+
+    // Calculate grid crossAxisCount
+    int crossAxisCount = 2;
+    double childAspectRatio = 1.05;
+    final width = constraints.maxWidth;
+
+    if (width >= 1200) {
+      crossAxisCount = 5;
+      childAspectRatio = 1.15;
+    } else if (width >= 900) {
+      crossAxisCount = 4;
+      childAspectRatio = 1.12;
+    } else if (width >= 650) {
+      crossAxisCount = 3;
+      childAspectRatio = 1.1;
+    } else {
+      crossAxisCount = 2;
+      childAspectRatio = 0.98;
+    }
+
+    if (filteredTools.isEmpty) {
+      return Center(
         child: Padding(
-          padding: const EdgeInsets.all(14.0),
+          padding: const EdgeInsets.all(32.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 24),
+              Icon(
+                _topTabIndex == 1 ? Icons.push_pin_outlined : Icons.search_off,
+                size: 56,
+                color: Colors.grey.shade400,
               ),
-              const Spacer(),
+              const SizedBox(height: 14),
               Text(
-                title,
+                _topTabIndex == 1
+                    ? 'কোনো টুল এখনও পিন করা হয়নি'
+                    : 'কোনো টুল পাওয়া যায়নি',
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: Color(0xFF334155),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textSecondary,
-                  height: 1.3,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                _topTabIndex == 1
+                    ? 'যেকোনো টুল কার্ডের ডানপাশের পিন আইকনে ট্যাপ করে এখানে যুক্ত করুন।'
+                    : 'ভিন্ন কোনো কীওয়ার্ড দিয়ে পুনরায় চেষ্টা করুন।',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
             ],
           ),
         ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filteredTools.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemBuilder: (ctx, idx) {
+              final tool = filteredTools[idx];
+              final isPinned = _pinnedToolIds.contains(tool.id);
+              return ToolCard(
+                item: tool,
+                isPinned: isPinned,
+                onPinToggle: () => _togglePin(tool.id),
+              );
+            },
+          ),
+
+          const SizedBox(height: 28),
+
+          // Bottom Review Section
+          const ReviewSection(),
+
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }

@@ -1,5 +1,5 @@
 name: bdland_pro
-description: "Bangladesh Land Survey, Measurement, Khatian and Muslim Inheritance (Faraiz) Flutter Application."
+description: "Bangladesh Land Survey, Measurement, Mouza CAD, Khatian and Inheritance Flutter Application."
 publish_to: "none"
 version: 1.0.0+1
 
@@ -12,6 +12,8 @@ dependencies:
   google_fonts: ^6.2.1
   shared_preferences: ^2.3.5
   intl: ^0.19.0
+  pdf: ^3.11.1
+  printing: ^5.13.2
 
 dev_dependencies:
   flutter_test:
