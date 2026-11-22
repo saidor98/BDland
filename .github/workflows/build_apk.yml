@@ -35,6 +35,8 @@ jobs:
         run: |
           rm -rf android
           flutter create . --org com.bdlandpro.app --project-name bdland_pro --platforms=android
+          # Remove auto-generated counter test template from flutter create
+          rm -f test/widget_test.dart
 
       - name: Install Dependencies
         run: flutter pub get
