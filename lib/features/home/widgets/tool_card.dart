@@ -79,7 +79,7 @@ class ToolCard extends StatelessWidget {
                         isPinned ? Icons.push_pin : Icons.push_pin_outlined,
                         size: 20,
                         color: isPinned
-                            ? AppColors.accentGold
+                            ? AppColors.secondaryGold
                             : Colors.grey.shade400,
                       ),
                     ),

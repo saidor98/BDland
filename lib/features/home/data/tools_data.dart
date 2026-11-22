@@ -226,7 +226,7 @@ class ToolsData {
       number: 20,
       title: 'হিস্যা ক্যালকুলেটর',
       subtitle: 'উত্তরাধিকার হিস্যা হিসাব',
-      icon: Icons.pie_chart_outlined,
+      icon: Icons.pie_chart_outline,
       badgeText: null,
       screenBuilder: (ctx) => const HissyaCalculatorScreen(),
       keywords: ['হিস্যা', 'অংশ', 'যোগ', 'বিয়োগ', 'হিসাব', 'hissya'],

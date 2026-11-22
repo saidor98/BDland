@@ -230,7 +230,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               border: Border(
                 bottom: BorderSide(color: Colors.grey.shade200, width: 1),
               ),
-            ],
+            ),
             child: Column(
               children: [
                 // Filter Tabs: সকল টুলস / পিন টুলস / ব্যবহারবিধি

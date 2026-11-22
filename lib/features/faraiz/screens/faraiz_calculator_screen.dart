@@ -322,7 +322,7 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
 
                     // Grandparents
                     _buildCounterRow(HeirType.paternalGrandfather, 'দাদা (Paternal Grandfather)', max: 1),
-                    _buildCounterRow(HeirType.paternalGrandgrandmother, 'দাদী (Paternal Grandmother)', max: 1),
+                    _buildCounterRow(HeirType.paternalGrandmother, 'দাদী (Paternal Grandmother)', max: 1),
                     _buildCounterRow(HeirType.maternalGrandmother, 'নানী (Maternal Grandmother)', max: 1),
 
                     // Siblings
@@ -587,9 +587,4 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
       ),
     );
   }
-}
-
-// Extension to map paternalGrandmother cleanly
-extension on _FaraizCalculatorScreenState {
-  HeirType get paternalGrandgrandmother => HeirType.paternalGrandmother;
 }
