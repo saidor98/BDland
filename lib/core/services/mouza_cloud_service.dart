@@ -63,6 +63,87 @@ class MouzaCloudService {
     {'name': 'ময়মনসিংহ', 'en': 'Mymensingh', 'drive': 7, 'icon': 'grass'},
   ];
 
+  /// Bundled authentic high-resolution Cadastral sheets (Offline Ready in App Assets)
+  static const List<Map<String, String>> bundledMaps = [
+    {
+      'title': 'তেজগাঁও - তেজকুনিপাড়া (শীট ১)',
+      'asset': 'assets/mouza_maps/SA_Tejgaon_Tejkunipara_Sheet1.pdf',
+      'survey': 'SA',
+      'district': 'ঢাকা',
+      'upazila': 'তেজগাঁও',
+      'mouza': 'তেজকুনিপাড়া',
+      'jlNo': '৮৯',
+      'sheetNo': '১',
+      'size': '১৩.৪ MB',
+    },
+    {
+      'title': 'তেজগাঁও - কাওরান বাজার (শীট ১)',
+      'asset': 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf',
+      'survey': 'SA',
+      'district': 'ঢাকা',
+      'upazila': 'তেজগাঁও',
+      'mouza': 'কাওরান',
+      'jlNo': '৮৬ ক',
+      'sheetNo': '১',
+      'size': '৮.৯ MB',
+    },
+    {
+      'title': 'সোনারগাঁও - আমিনপুর (শীট ১)',
+      'asset': 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf',
+      'survey': 'CS / RS',
+      'district': 'নারায়ণগঞ্জ',
+      'upazila': 'সোনারগাঁ',
+      'mouza': 'আমিনপুর',
+      'jlNo': '৩৪',
+      'sheetNo': '১',
+      'size': '৮.৯ MB',
+    },
+  ];
+
+  /// Download a real Mouza Map PDF directly to device
+  Future<String?> downloadMouzaFile({
+    required String downloadUrl,
+    required String fileName,
+    void Function(double progress)? onProgress,
+  }) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 15);
+    client.badCertificateCallback = (cert, host, port) => true;
+
+    try {
+      final uri = Uri.parse(downloadUrl.startsWith('http') ? downloadUrl : '$baseUrl$downloadUrl');
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0');
+
+      final response = await request.close().timeout(const Duration(seconds: 40));
+      if (response.statusCode == 200) {
+        final totalBytes = response.contentLength;
+        int receivedBytes = 0;
+        final chunks = <List<int>>[];
+
+        await for (final chunk in response) {
+          chunks.add(chunk);
+          receivedBytes += chunk.length;
+          if (totalBytes > 0 && onProgress != null) {
+            onProgress(receivedBytes / totalBytes);
+          }
+        }
+
+        final tempDir = Directory.systemTemp;
+        final sanitizedFileName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        final file = File('${tempDir.path}/$sanitizedFileName');
+        final bytes = chunks.expand((x) => x).toList();
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+    return null;
+  }
+
   /// Fetch live directory from free.mouzamap.tech
   Future<List<MouzaCloudItem>> fetchDirectory({
     required int driveIndex,

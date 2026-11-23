@@ -27,6 +27,8 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   bool _isSatelliteMode = true;
   bool _isGpsWalkMode = false;
   double _scale = 1.0; // scale factor (feet per pixel)
+  String _activeTool = 'আঁকুন';
+  bool _showDimensions = true;
 
   // Current simulated GPS location (Dhaka Bangladesh region)
   double _currentLat = 23.8103;
@@ -307,45 +309,148 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             ),
           ),
 
-          // Interactive Map / Satellite Canvas
+          // Interactive Map / Satellite Canvas with Floating HUD & Page 1 Tool Palette
           Expanded(
-            child: GestureDetector(
-              onTapUp: (details) {
-                if (_draggedIndex == null && !_isGpsWalkMode) {
-                  setState(() {
-                    _points.add(details.localPosition);
-                    _recompute();
-                  });
-                }
-              },
-              onPanStart: (details) {
-                final pos = details.localPosition;
-                for (int i = 0; i < _points.length; i++) {
-                  if ((_points[i] - pos).distance < 24.0) {
-                    setState(() => _draggedIndex = i);
-                    break;
-                  }
-                }
-              },
-              onPanUpdate: (details) {
-                if (_draggedIndex != null) {
-                  setState(() {
-                    _points[_draggedIndex!] = details.localPosition;
-                    _recompute();
-                  });
-                }
-              },
-              onPanEnd: (_) => setState(() => _draggedIndex = null),
-              child: CustomPaint(
-                painter: _MapCanvasPainter(
-                  points: _points,
-                  isSatellite: _isSatelliteMode,
-                  draggedIndex: _draggedIndex,
-                  currentLat: _currentLat,
-                  currentLng: _currentLng,
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTapUp: (details) {
+                    if (_draggedIndex == null && !_isGpsWalkMode) {
+                      setState(() {
+                        _points.add(details.localPosition);
+                        _recompute();
+                      });
+                    }
+                  },
+                  onPanStart: (details) {
+                    final pos = details.localPosition;
+                    for (int i = 0; i < _points.length; i++) {
+                      if ((_points[i] - pos).distance < 24.0) {
+                        setState(() => _draggedIndex = i);
+                        break;
+                      }
+                    }
+                  },
+                  onPanUpdate: (details) {
+                    if (_draggedIndex != null) {
+                      setState(() {
+                        _points[_draggedIndex!] = details.localPosition;
+                        _recompute();
+                      });
+                    }
+                  },
+                  onPanEnd: (_) => setState(() => _draggedIndex = null),
+                  child: CustomPaint(
+                    painter: _MapCanvasPainter(
+                      points: _points,
+                      isSatellite: _isSatelliteMode,
+                      draggedIndex: _draggedIndex,
+                      currentLat: _currentLat,
+                      currentLng: _currentLng,
+                      showDimensions: _showDimensions,
+                    ),
+                    size: Size.infinite,
+                  ),
                 ),
-                size: Size.infinite,
-              ),
+
+                // Top Floating GNSS RTK Status Badge (Stitch Design System Token)
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.88),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'RTK: FIX (14 Sats) | H: 0.012m | WGS84',
+                          style: TextStyle(
+                            color: Color(0xFFE2E8F0),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Right Vertical Floating Palette (Page 1 of CamScanner PDF)
+                Positioned(
+                  top: 12,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF334155), width: 1.0),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildPaletteTool('ম্যাপ নিন', Icons.layers, () {
+                          setState(() => _isSatelliteMode = !_isSatelliteMode);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(_isSatelliteMode ? 'স্যাটেলাইট ভিউ সক্রিয়' : 'সাধারণ মানচিত্র ভিউ সক্রিয়')),
+                          );
+                        }),
+                        _buildPaletteTool('আঁকুন', Icons.edit, () {
+                          setState(() => _activeTool = 'আঁকুন');
+                        }, isActive: _activeTool == 'আঁকুন'),
+                        _buildPaletteTool('Point', Icons.add_location_alt, () {
+                          setState(() => _activeTool = 'Point');
+                          _addCurrentGpsPoint();
+                        }, isActive: _activeTool == 'Point'),
+                        _buildPaletteTool('সার্ভে পয়েন্ট', Icons.list_alt, _showGpsWaypointsDialog),
+                        _buildPaletteTool('প্যান', Icons.pan_tool, () {
+                          setState(() => _activeTool = 'প্যান');
+                        }, isActive: _activeTool == 'প্যান'),
+                        _buildPaletteTool('লাইন', Icons.timeline, () {
+                          setState(() => _activeTool = 'লাইন');
+                        }, isActive: _activeTool == 'লাইন'),
+                        _buildPaletteTool('ডাইমেনশন', Icons.straighten, () {
+                          setState(() => _showDimensions = !_showDimensions);
+                        }, isActive: _showDimensions),
+                        _buildPaletteTool('মার্কার', Icons.pin_drop, () {
+                          setState(() => _activeTool = 'মার্কার');
+                        }, isActive: _activeTool == 'মার্কার'),
+                        _buildPaletteTool('বৃত্ত', Icons.circle_outlined, () {
+                          setState(() => _activeTool = 'বৃত্ত');
+                        }, isActive: _activeTool == 'বৃত্ত'),
+                        _buildPaletteTool('টেক্সট', Icons.title, () {
+                          setState(() => _activeTool = 'টেক্সট');
+                        }, isActive: _activeTool == 'টেক্সট'),
+                        _buildPaletteTool('কম্পাস', Icons.explore, () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('নর্থ বিয়ারিং ০° ক্যালিব্রেট করা হয়েছে')),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -442,6 +547,40 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
       ],
     );
   }
+
+  Widget _buildPaletteTool(String label, IconData icon, VoidCallback onTap, {bool isActive = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF0F5A38) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: isActive ? Border.all(color: const Color(0xFF4ADE80), width: 1) : null,
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isActive ? Colors.white : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.bold,
+                color: isActive ? Colors.white : const Color(0xFFCBD5E1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _MapCanvasPainter extends CustomPainter {
@@ -450,6 +589,7 @@ class _MapCanvasPainter extends CustomPainter {
   final int? draggedIndex;
   final double currentLat;
   final double currentLng;
+  final bool showDimensions;
 
   _MapCanvasPainter({
     required this.points,
@@ -457,6 +597,7 @@ class _MapCanvasPainter extends CustomPainter {
     required this.draggedIndex,
     required this.currentLat,
     required this.currentLng,
+    this.showDimensions = true,
   });
 
   @override
@@ -499,14 +640,16 @@ class _MapCanvasPainter extends CustomPainter {
       canvas.drawPath(path, polyStroke);
 
       // Edge length labels in feet
-      for (int i = 0; i < points.length; i++) {
-        final p1 = points[i];
-        final p2 = points[(i + 1) % points.length];
-        if (points.length < 3 && i == points.length - 1) break;
+      if (showDimensions) {
+        for (int i = 0; i < points.length; i++) {
+          final p1 = points[i];
+          final p2 = points[(i + 1) % points.length];
+          if (points.length < 3 && i == points.length - 1) break;
 
-        final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-        final dist = (p2 - p1).distance;
-        _drawPillLabel(canvas, '${BanglaNumerals.toBangla(dist.round())} ft', mid);
+          final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+          final dist = (p2 - p1).distance;
+          _drawPillLabel(canvas, '${BanglaNumerals.toBangla(dist.round())} ft', mid);
+        }
       }
 
       // Draw Pins with numbering

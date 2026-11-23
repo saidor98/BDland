@@ -16,6 +16,27 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
   bool _isBlackAndWhite = true;
   String _targetFormat = 'PDF';
 
+  // Page 8: Scale & DPI Selection
+  int _dpi = 300; // 150, 300, 400, 600
+  String _scale = '১৬" = ১ মাইল'; // 16", 32", 64", 80"
+
+  double get _feetPerInch {
+    switch (_scale) {
+      case '৩২" = ১ মাইল':
+        return 165.0;
+      case '৬৪" = ১ মাইল':
+        return 82.5;
+      case '৮০" = ১ মাইল':
+        return 66.0;
+      case '১৬" = ১ মাইল':
+      default:
+        return 330.0;
+    }
+  }
+
+  double get _feetPerPixel => _feetPerInch / _dpi;
+  double get _linksPerPixel => (_feetPerInch / 0.66) / _dpi;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,6 +138,79 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
+
+                // Page 8: Scale & DPI Selection
+                Row(
+                  children: [
+                    const Text('ম্যাপ স্কেল: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    DropdownButton<String>(
+                      value: _scale,
+                      items: const [
+                        DropdownMenuItem(value: '১৬" = ১ মাইল', child: Text('১৬" = ১ মাইল (CS/RS)')),
+                        DropdownMenuItem(value: '৩২" = ১ মাইল', child: Text('৩২" = ১ মাইল')),
+                        DropdownMenuItem(value: '৬৪" = ১ মাইল', child: Text('৬৪" = ১ মাইল')),
+                        DropdownMenuItem(value: '৮০" = ১ মাইল', child: Text('৮০" = ১ মাইল')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _scale = val);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Text('রেজোলিউশন (DPI): ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    ...[150, 300, 400, 600].map((dpi) {
+                      final isSel = _dpi == dpi;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text('$dpi', style: TextStyle(color: isSel ? Colors.white : Colors.black87, fontSize: 12)),
+                          selected: isSel,
+                          selectedColor: AppColors.primaryGreen,
+                          onSelected: (_) => setState(() => _dpi = dpi),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Live Calibration Card
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          const Text('১ ইঞ্চি =', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('${BanglaNumerals.toBangla(_dpi)} পিক্সেল', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF15803D))),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          const Text('১ পিক্সেল =', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('${BanglaNumerals.toBangla(_feetPerPixel.toStringAsFixed(3))} ফুট', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF15803D))),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          const Text('১ পিক্সেল =', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('${BanglaNumerals.toBangla(_linksPerPixel.toStringAsFixed(3))} লিংক', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF15803D))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(

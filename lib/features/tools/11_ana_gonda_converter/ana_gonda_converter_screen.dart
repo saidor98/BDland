@@ -94,13 +94,54 @@ class _AnaGondaConverterScreenState extends State<AnaGondaConverterScreen> {
             ),
             const SizedBox(height: 14),
 
-            // On-screen Virtual Keypad
-            AnaGondaKeypad(
-              onAnaSelected: (val) => setState(() => _anaCtrl.text = val.toString()),
-              onGondaSelected: (val) => setState(() => _gondaCtrl.text = val.toString()),
-              onKoraSelected: (val) => setState(() => _koraCtrl.text = val.toString()),
-              onKrantiSelected: (val) => setState(() => _krantiCtrl.text = val.toString()),
-              onTilSelected: (val) => setState(() => _tilCtrl.text = val.toString()),
+            // 16-Ana Fractional Breakdown Formula Card (Page 7)
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.functions, color: AppColors.primaryGreen, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          '১৬ আনা হিস্যা ভগ্নাংশ বিভাজন সূত্র',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        '(${BanglaNumerals.toBangla(s.ana)}/১৬) + (${BanglaNumerals.toBangla(s.gonda)}/৩২০) + (${BanglaNumerals.toBangla(s.kora)}/১২৮০) + (${BanglaNumerals.toBangla(s.kranti)}/৩৮৪০) + (${BanglaNumerals.toBangla(s.til)}/৭৬৮০০)',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F5A38),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '= মোট ${BanglaNumerals.toBangla(s.toTotalTil())} তিল / ৭৬,৮০০ তিল (অনুপাত: ${s.toFraction().toStringAsFixed(6)})',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 14),
 

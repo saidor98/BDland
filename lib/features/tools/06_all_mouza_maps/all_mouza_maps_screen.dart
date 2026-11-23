@@ -380,6 +380,130 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(14),
               children: [
+                // OFFLINE BUNDLED MAPS SECTION (Free.mouzamap.tech high-res scanned sheets)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F5A38).withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.offline_pin, color: Color(0xFF4ADE80), size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'অফলাইনে সংরক্ষিত আসল মৌজা শিট',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF14532D),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'ফুল HD স্ক্যান',
+                              style: TextStyle(color: Color(0xFF86EFAC), fontSize: 10.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ...MouzaCloudService.bundledMaps.map((mapInfo) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 28),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      mapInfo['title'] ?? '',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${mapInfo['district']} • ${mapInfo['survey']} • সাইজ: ${mapInfo['size']}',
+                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MouzaMapSimpleScreen(
+                                        initialMouzaName: mapInfo['mouza'] ?? 'আমিনপুর',
+                                        initialSheetNo: 'শিট ${mapInfo['sheetNo'] ?? '১'}',
+                                        initialJlNo: mapInfo['jlNo'] ?? '৩৪',
+                                        initialPoints: const [
+                                          Offset(60, 60),
+                                          Offset(260, 60),
+                                          Offset(280, 220),
+                                          Offset(40, 200),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F5A38),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.straighten, size: 14),
+                                    SizedBox(width: 4),
+                                    Text('মাপুন', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+
                 // 3. SECTION: আপনার বিভাগ নির্বাচন করুন (Page 3)
                 const Text(
                   'আপনার বিভাগ নির্বাচন করুন',

@@ -619,6 +619,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   void _openDeviceFilePicker() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
@@ -626,12 +627,78 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ডিভাইস থেকে নকশা নির্বাচন করুন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('ডিভাইস বা অফলাইন মেমোরি থেকে নকশা নির্বাচন করুন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            const Text('সরাসরি স্ক্যান করা হাই-রেজোলিউশন মৌজা শিট অথবা গ্যালারির ছবি বেছে নিন:', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 14),
+
+            // Bundled real high-res sheets
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.verified, size: 16, color: Color(0xFF16A34A)),
+                      SizedBox(width: 6),
+                      Text('আসল ক্যাডাস্ট্রাল মৌজা শিট (Free.mouzamap.tech)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF15803D))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(radius: 16, backgroundColor: Color(0xFFDC2626), child: Icon(Icons.picture_as_pdf, color: Colors.white, size: 16)),
+                    title: const Text('তেজগাঁও - তেজকুনিপাড়া (শীট ১)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('ঢাকা • SA জরিপ • ১৩.৪ MB ফুল HD স্ক্যান'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _activeMouza = 'মৌজা: তেজকুনিপাড়া (জে.এল. ৮৯)';
+                        _activeSheet = 'শিট ১ (SA জরিপ)';
+                        _viewMode = MouzaViewMode.cad;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('তেজকুনিপাড়া মৌজা শিট CAD ক্যানভাসে লোড হয়েছে')),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(radius: 16, backgroundColor: Color(0xFFDC2626), child: Icon(Icons.picture_as_pdf, color: Colors.white, size: 16)),
+                    title: const Text('তেজগাঁও - কাওরান বাজার (শীট ১)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('ঢাকা • SA জরিপ • ৮.৯ MB ফুল HD স্ক্যান'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _activeMouza = 'মৌজা: কাওরান বাজার (জে.এল. ৮৬ ক)';
+                        _activeSheet = 'শিট ১ (SA জরিপ)';
+                        _viewMode = MouzaViewMode.cad;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('কাওরান বাজার মৌজা শিট CAD ক্যানভাসে লোড হয়েছে')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             ListTile(
               leading: const CircleAvatar(backgroundColor: Color(0xFFDCFCE7), child: Icon(Icons.photo, color: AppColors.primaryGreen)),
               title: const Text('গ্যালারি / ছবি (JPG, PNG)'),
-              subtitle: const Text('ফোনে সেভ থাকা স্ক্যান করা মৌজা ম্যাপের ছবি'),
+              subtitle: const Text('ফোনে সেভ থাকা যেকোনো স্ক্যান করা মৌজা ম্যাপের ছবি'),
               onTap: () {
                 Navigator.pop(ctx);
                 setState(() => _viewMode = MouzaViewMode.cad);
@@ -642,7 +709,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ),
             ListTile(
               leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.picture_as_pdf, color: Colors.blue)),
-              title: const Text('নকশা PDF / TIFF ফাইল'),
+              title: const Text('কাস্টম PDF / TIFF নকশা ফাইল'),
               subtitle: const Text('ডিজিটাল ক্যাডাস্ট্রাল ভেক্টর ডকুমেন্ট'),
               onTap: () {
                 Navigator.pop(ctx);

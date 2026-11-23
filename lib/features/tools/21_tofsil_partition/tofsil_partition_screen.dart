@@ -34,6 +34,8 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
     final total = double.tryParse(_totalLandCtrl.text) ?? 0.0;
     final part = double.tryParse(_partitionLandCtrl.text) ?? 0.0;
     final sqFt = part * 435.60;
+    final namjariShare1000 = total > 0 ? ((part / total) * 1000).round() : 0;
+    final fractionShare = total > 0 ? (part / total).toStringAsFixed(4) : '0.0000';
 
     return '''
 =====================================================
@@ -46,8 +48,9 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
 দাগ নং: ${_dagCtrl.text}
 শ্রেণি: নাল / বাস্তু
 দাগে মোট জমির পরিমাণ: ${BanglaFormatter.formatNumber(total, fractionDigits: 2)} শতক।
+নামজারি হিস্যা (১০০০ স্কেল): ${BanglaNumerals.toBangla(namjariShare1000)} / ১০০০ (অংশ: $fractionShare)।
 
-অদ্য বাটোয়ারা/বণ্টন দলিলের বর্ণনা মতে উক্ত দাগের মধ্য হইতে অত্র দলিলগ্রহীতার অংশে নালিশী ভূমির পরিমাণ: ${BanglaFormatter.formatNumber(part, fractionDigits: 2)} (ছয় দশমিক দুই পাঁচ) শতক জমি [যাহা বর্গফুটে প্রায় ${BanglaFormatter.formatNumber(sqFt)} বর্গফুট] হস্তান্তরিত ও বণ্টিত হইল।
+অদ্য বাটোয়ারা/বণ্টন দলিলের বর্ণনা মতে উক্ত দাগের মধ্য হইতে অত্র দলিলগ্রহীতার অংশে নালিশী ভূমির পরিমাণ: ${BanglaFormatter.formatNumber(part, fractionDigits: 2)} শতক জমি [যাহা বর্গফুটে প্রায় ${BanglaFormatter.formatNumber(sqFt)} বর্গফুট] হস্তান্তরিত ও বণ্টিত হইল।
 
 উক্ত হস্তান্তরকৃত ${BanglaFormatter.formatNumber(part, fractionDigits: 2)} শতক জমির চৌহদ্দি (সীমানা):
 -----------------------------------------------------

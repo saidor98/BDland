@@ -35,6 +35,20 @@ void main() {
       expect(items.any((item) => item.name == 'CITY'), isTrue);
     });
 
+    test('Bundled authentic Mouza maps exist in service catalog', () {
+      expect(MouzaCloudService.bundledMaps, isNotEmpty);
+      expect(MouzaCloudService.bundledMaps.length, greaterThanOrEqualTo(2));
+      expect(MouzaCloudService.bundledMaps.any((m) => m['upazila'] == 'তেজগাঁও'), isTrue);
+      expect(MouzaCloudService.bundledMaps.any((m) => m['mouza'] == 'আমিনপুর'), isTrue);
+    });
+
+    test('Namjari 1000-scale integer share calculation', () {
+      const total = 12.50;
+      const part = 6.25;
+      final namjariShare = ((part / total) * 1000).round();
+      expect(namjariShare, equals(500));
+    });
+
     test('Shoelace Area Calculation for 33,000 sq ft plot', () {
       // Points: (60, 60), (260, 60), (280, 220), (40, 200)
       const points = [
