@@ -970,6 +970,17 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     final dec = _totalAreaSqFt / 435.60;
     final katha = _totalAreaSqFt / 720.00;
 
+    final cadCanvas = CustomPaint(
+      painter: _CadInteractivePainter(
+        points: _measuredPoints,
+        feetPerPixel: _feetPerPixel,
+        showAngles: _showAngles,
+        showDimensions: _showDimensions,
+        highContrast: _highContrast,
+      ),
+      size: Size.infinite,
+    );
+
     return Scaffold(
       backgroundColor: _highContrast ? Colors.white : const Color(0xFF0F172A),
       appBar: AppBar(
@@ -1105,16 +1116,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                       _selectedVertexIndex = null;
                     });
                   },
-                  child: CustomPaint(
-                    painter: _CadInteractivePainter(
-                      points: _measuredPoints,
-                      feetPerPixel: _feetPerPixel,
-                      showAngles: _showAngles,
-                      showDimensions: _showDimensions,
-                      highContrast: _highContrast,
-                    ),
-                    size: Size.infinite,
-                  ),
+                  child: cadCanvas,
                 ),
 
                 // Floating 1000-Link Digital Gunia Scale
@@ -1126,13 +1128,10 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
                 // Precision Touch Loupe (Zoom 2.2x offset above finger)
                 if (_isTouchActive && _touchPosition != null)
-                  Positioned(
-                    left: _touchPosition!.dx - 45,
-                    top: _touchPosition!.dy - 120,
-                    child: TouchMagnifierLoupe(
-                      touchPosition: _touchPosition!,
-                      label: 'X: ${_touchPosition!.dx.toInt()} Y: ${_touchPosition!.dy.toInt()}',
-                    ),
+                  TouchMagnifierLoupe(
+                    touchPosition: _touchPosition!,
+                    scaleFactor: 2.2,
+                    child: cadCanvas,
                   ),
               ],
             ),
