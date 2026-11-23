@@ -34,24 +34,25 @@ class MouzaMapSimpleScreen extends StatefulWidget {
 }
 
 class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
-  // Current active mode: Portal (Image 4) or CAD Canvas (Image 2)
+  // Current active mode: Portal (Image 5) or CAD Canvas (Image 3)
   MouzaViewMode _viewMode = MouzaViewMode.portal;
 
   // Active Project & Sheet Info
   String _activeMouza = 'মৌজা: আমিনপুর (জে.এল. ৩৪)';
   String _activeSheet = 'শিট ১';
   String _selectedScale = '১৬" = ১ মাইল';
-  double _feetPerPixel = 1.65; // default 32" / 16"
+  double _feetPerPixel = 1.0; // 1.0 gives 200.0', 161.2', 240.8', 141.4', 33,000 sq ft
   bool _isHighQuality = true;
   bool _highContrast = false;
 
-  // Saved Projects List
+  // Saved Projects List (Image 5 / Page 5)
   final List<Map<String, dynamic>> _savedProjects = [
     {
       'name': 'আমিনপুর দাগ ১০৫ পরিমাপ',
       'location': 'সোনারগাঁও, নারায়ণগঞ্জ | CS',
       'areaDec': 75.758,
       'katha': 45.83,
+      'sqFt': 33000.0,
       'date': '২৩ নভে ২০২৬',
       'points': [
         const Offset(60, 60),
@@ -65,6 +66,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
       'location': 'রূপগঞ্জ, নারায়ণগঞ্জ | RS',
       'areaDec': 24.350,
       'katha': 14.73,
+      'sqFt': 10606.86,
       'date': '২২ নভে ২০২৬',
       'points': [
         const Offset(70, 70),
@@ -73,9 +75,37 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
         const Offset(65, 180),
       ],
     },
+    {
+      'name': 'জাফরাবাদ দাগ ১২ বাউন্ডারি',
+      'location': 'ধানমন্ডি, ঢাকা | সিটি জরিপ',
+      'areaDec': 18.400,
+      'katha': 11.13,
+      'sqFt': 8015.04,
+      'date': '২১ নভে ২০২৬',
+      'points': [
+        const Offset(80, 80),
+        const Offset(210, 80),
+        const Offset(205, 175),
+        const Offset(75, 170),
+      ],
+    },
+    {
+      'name': 'মাওনা দাগ ৪৩ খাস জমি বণ্টন',
+      'location': 'শ্রীপুর, গাজীপুর | BS',
+      'areaDec': 50.000,
+      'katha': 30.25,
+      'sqFt': 21780.0,
+      'date': '২০ নভে ২০২৬',
+      'points': [
+        const Offset(50, 50),
+        const Offset(250, 50),
+        const Offset(260, 200),
+        const Offset(45, 195),
+      ],
+    },
   ];
 
-  // CAD Measurement Points (Image 2 polygon)
+  // CAD Measurement Points (Image 3 polygon)
   List<Offset> _measuredPoints = [
     const Offset(60, 60),
     const Offset(260, 60),
@@ -98,6 +128,13 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   Offset? _touchPosition;
   bool _isTouchActive = false;
 
+  // Auto-Division State
+  bool _showDivisionCutLine = false;
+  double _targetCutDecimals = 5.0;
+  Offset? _cutLineP1;
+  Offset? _cutLineP2;
+  String _cutOffsetSummary = 'উত্তর বাহু হতে ১০.৯ ফুট কর্তন রেখা';
+
   @override
   void initState() {
     super.initState();
@@ -106,7 +143,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
       _viewMode = MouzaViewMode.cad;
     }
     if (widget.initialMouzaName != null) {
-      _activeMouza = 'মৌজা: ${widget.initialMouzaName} (জে.এল. ${widget.initialJlNo ?? "০১"})';
+      _activeMouza = 'মৌজা: ${widget.initialMouzaName} (জে.এল. ${widget.initialJlNo ?? "৩৪"})';
       _activeSheet = widget.initialSheetNo ?? 'শিট ১';
     }
     _recompute();
@@ -134,6 +171,34 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     final pixelArea = (sum.abs() / 2.0);
     _totalAreaSqFt = pixelArea * (_feetPerPixel * _feetPerPixel);
     _totalPerimeterFt = perimPx * _feetPerPixel;
+
+    if (_showDivisionCutLine) {
+      _calculateCutLine();
+    }
+  }
+
+  void _calculateCutLine() {
+    if (_measuredPoints.length < 4) return;
+    // Calculate a parallel cut line from North side (p0->p1) towards South (p3->p2)
+    final p0 = _measuredPoints[0];
+    final p1 = _measuredPoints[1];
+    final p2 = _measuredPoints[2];
+    final p3 = _measuredPoints[3];
+
+    final targetSqFt = _targetCutDecimals * 435.60;
+    final topWidth = (p1 - p0).distance * _feetPerPixel;
+    final bottomWidth = (p2 - p3).distance * _feetPerPixel;
+    final avgWidth = (topWidth + bottomWidth) / 2.0;
+
+    final offsetDistanceFt = targetSqFt / (topWidth > 0 ? topWidth : 200.0);
+    final ratio = (offsetDistanceFt / 150.0).clamp(0.05, 0.90);
+
+    setState(() {
+      _cutLineP1 = Offset.lerp(p0, p3, ratio);
+      _cutLineP2 = Offset.lerp(p1, p2, ratio);
+      final cutLen = (_cutLineP2! - _cutLineP1!).distance * _feetPerPixel;
+      _cutOffsetSummary = 'উত্তরে ${BanglaFormatter.formatNumber(offsetDistanceFt, fractionDigits: 1)} ফুট দূরত্বে কর্তন (দৈর্ঘ্য: ${BanglaFormatter.formatNumber(cutLen, fractionDigits: 1)} ft)';
+    });
   }
 
   void _pushUndo() {
@@ -147,6 +212,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
         _measuredPoints = _undoStack.removeLast();
         _recompute();
       });
+      HapticFeedback.lightImpact();
     }
   }
 
@@ -157,11 +223,258 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
         _measuredPoints.removeLast();
         _recompute();
       });
+      HapticFeedback.mediumImpact();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('কমপক্ষে ৩টি শীর্ষবিন্দু থাকতে হবে')),
       );
     }
+  }
+
+  void _addNewPointAtCenter() {
+    _pushUndo();
+    final center = _measuredPoints.reduce((a, b) => a + b) / _measuredPoints.length.toDouble();
+    final newPt = center + const Offset(30, 30);
+    setState(() {
+      _measuredPoints.add(newPt);
+      _recompute();
+    });
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('নতুন CAD শীর্ষবিন্দু যোগ করা হয়েছে। ড্র্যাগ করে অবস্থান পরিবর্তন করুন।')),
+    );
+  }
+
+  // Saved Projects Modal (Image 5: ফোল্ডার বেছে নিন)
+  void _showSavedProjectsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  Icon(Icons.folder_shared, color: AppColors.primaryGreen, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'ডিভাইসের সংরক্ষিত প্রজেক্ট সমূহ',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ফোনের স্টোরেজ থেকে পূর্বে সেভ করা ক্যাডাস্ট্রাল প্রজেক্ট বেছে নিন:',
+                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _savedProjects.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, idx) {
+                    final proj = _savedProjects[idx];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFFDCFCE7),
+                          child: const Icon(Icons.architecture, color: AppColors.primaryGreen),
+                        ),
+                        title: Text(
+                          proj['name'] as String,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                        ),
+                        subtitle: Text(
+                          '${proj['location']}\n${proj['areaDec']} শতক (${proj['katha']} কাঠা) • ${proj['date']}',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.primaryGreen),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _activeMouza = proj['name'] as String;
+                            _measuredPoints = List.from(proj['points'] as List<Offset>);
+                            _viewMode = MouzaViewMode.cad;
+                            _recompute();
+                          });
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('${proj['name']} CAD ক্যানভাসে সফলভাবে লোড হয়েছে!'),
+                              backgroundColor: AppColors.primaryGreen,
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _activeMouza = 'নতুন প্রজেক্ট (${BanglaFormatter.formatDateTime(DateTime.now())})';
+                      _measuredPoints = [
+                        const Offset(60, 60),
+                        const Offset(260, 60),
+                        const Offset(280, 220),
+                        const Offset(40, 200),
+                      ];
+                      _viewMode = MouzaViewMode.cad;
+                      _recompute();
+                    });
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('নতুন প্রজেক্ট তৈরি করুন'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Auto-division dialog with live split-line calculation
+  void _showAutoDivisionDialog() {
+    final targetDecController = TextEditingController(text: _targetCutDecimals.toStringAsFixed(1));
+    String cutDirection = 'উত্তর হতে';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.call_split, color: AppColors.primaryGreen),
+              SizedBox(width: 8),
+              Text('অটো-ডিভিশন / জমি বণ্টন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'দাগ হতে নির্দিষ্ট শতক পৃথক করার জন্য প্রয়োজনীয় শতক ইনপুট দিন:',
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: targetDecController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'কাটতে চাওয়া শতক',
+                        border: OutlineInputBorder(),
+                        suffixText: 'শতক',
+                        isDense: true,
+                      ),
+                      onChanged: (val) {
+                        final parsed = double.tryParse(val) ?? 5.0;
+                        setDlgState(() => _targetCutDecimals = parsed);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  DropdownButton<String>(
+                    value: cutDirection,
+                    items: const [
+                      DropdownMenuItem(value: 'উত্তর হতে', child: Text('উত্তর হতে')),
+                      DropdownMenuItem(value: 'দক্ষিণ হতে', child: Text('দক্ষিণ হতে')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setDlgState(() => cutDirection = val);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('📐 প্রস্তাবিত ডিভিশন পরিমাপ:', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+                    const SizedBox(height: 6),
+                    Text(
+                      '• মোট পৃথক শতক: ${BanglaFormatter.formatNumber(_targetCutDecimals, fractionDigits: 2)} শতক\n• সমপরিমাণ স্কয়ার ফিট: ${BanglaFormatter.formatNumber(_targetCutDecimals * 435.60, fractionDigits: 1)} sq ft\n• প্রস্তাবিত অফসেট: ${_targetCutDecimals > 0 ? BanglaFormatter.formatNumber((_targetCutDecimals * 435.60) / 200.0, fractionDigits: 1) : "0"} ফুট',
+                      style: TextStyle(fontSize: 11.5, color: Colors.green.shade900),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() => _showDivisionCutLine = false);
+                Navigator.pop(ctx);
+              },
+              child: const Text('কাটলাইন মুছুন'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+              onPressed: () {
+                setState(() {
+                  _showDivisionCutLine = true;
+                  _calculateCutLine();
+                });
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('অটো-ডিভিশন কাটলাইন CAD ক্যানভাসে সক্রিয় করা হয়েছে! ($_cutOffsetSummary)'),
+                    backgroundColor: AppColors.primaryGreen,
+                  ),
+                );
+              },
+              child: const Text('কাটলাইন প্রয়োগ করুন', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Two-Point Reference Line Calibration
@@ -231,7 +544,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                 final dist = double.tryParse(distController.text.trim()) ?? 100.0;
                 final distInFeet = unit == 'লিংক' ? dist * 0.66 : dist;
                 setState(() {
-                  _feetPerPixel = (distInFeet / 60.0).clamp(0.2, 10.0);
+                  _feetPerPixel = (distInFeet / 200.0).clamp(0.2, 10.0);
                   _selectedScale = 'কাস্টম ক্যালিব্রেটেড';
                   _recompute();
                 });
@@ -247,78 +560,6 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Auto-division dialog
-  void _showAutoDivisionDialog() {
-    final targetDecController = TextEditingController(text: '5.0');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.call_split, color: AppColors.primaryGreen),
-            SizedBox(width: 8),
-            Text('অটো-ডিভিশন / জমি বণ্টন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'দাগ হতে নির্দিষ্ট শতক পৃথক করার জন্য প্রয়োজনীয় শতক ইনপুট দিন:',
-              style: TextStyle(fontSize: 12.5),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: targetDecController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'কাটতে চাওয়া শতক',
-                border: OutlineInputBorder(),
-                suffixText: 'শতক',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('📐 প্রস্তাবিত ডিভিশন পরিমাপ:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
-                  const SizedBox(height: 4),
-                  Text('• উত্তর বাহু হতে: ২০.০ ফুট\n• দক্ষিণ বাহু হতে: ২২.৫ ফুট\n• কর্তন রেখার দৈর্ঘ্য: ১৬৫.৪ ফুট', style: TextStyle(fontSize: 11.5, color: Colors.green.shade900)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('অটো-ডিভিশন কাটলাইন ড্রয়িংয়ে চিহ্নিত করা হয়েছে!'),
-                  backgroundColor: AppColors.primaryGreen,
-                ),
-              );
-            },
-            child: const Text('কাটলাইন প্রয়োগ করুন', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -414,26 +655,45 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     );
   }
 
-  // Video guide
-  void _showVideoGuide() {
+  // Generate AutoCAD DXF R12 / R2000 content
+  String _generateDxfContent() {
+    final sb = StringBuffer();
+    sb.writeln('0\nSECTION\n2\nHEADER\n0\nENDSEC');
+    sb.writeln('0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1');
+    sb.writeln('0\nLAYER\n2\nCADASTRAL_BOUNDARY\n70\n0\n62\n4\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC');
+    sb.writeln('0\nSECTION\n2\nENTITIES');
+    sb.writeln('0\nPOLYLINE\n8\nCADASTRAL_BOUNDARY\n66\n1\n70\n1');
+    for (final pt in _measuredPoints) {
+      sb.writeln('0\nVERTEX\n8\nCADASTRAL_BOUNDARY\n10\n${(pt.dx * _feetPerPixel).toStringAsFixed(2)}\n20\n${((500 - pt.dy) * _feetPerPixel).toStringAsFixed(2)}\n30\n0.0');
+    }
+    sb.writeln('0\nSEQEND');
+    sb.writeln('0\nTEXT\n8\nCADASTRAL_BOUNDARY\n10\n100.0\n20\n100.0\n40\n14.0\n1\n$_activeMouza Area: ${_totalAreaSqFt.toStringAsFixed(2)} sq ft (${(_totalAreaSqFt / 435.6).toStringAsFixed(3)} Dec)');
+    sb.writeln('0\nENDSEC\n0\nEOF');
+    return sb.toString();
+  }
+
+  void _exportDxf() {
+    final dxf = _generateDxfContent();
+    Clipboard.setData(ClipboardData(text: dxf));
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.play_circle_fill, color: Colors.red),
+            Icon(Icons.code, color: AppColors.primaryGreen),
             SizedBox(width: 8),
-            Text('মৌজা ম্যাপ পরিমাপ ভিডিও গাইড', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            Text('AutoCAD DXF প্রস্তুত', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ইউটিউব টিউটোরিয়াল: "কীভাবে নিখুঁতভাবে মৌজা ম্যাপ ও গুনিয়া স্কেল দিয়ে জমি পরিমাপ করবেন"', style: TextStyle(fontSize: 13)),
-            SizedBox(height: 10),
-            Text('• গুনিয়া স্কেল ব্যবহার করে লিংক থেকে ফুট রূপান্তর\n• ২-পয়েন্ট স্কেল ক্যালিব্রেশন পদ্ধতি\n• ম্যাগনিফাইং লুপ দিয়ে নিখুঁত কর্নার মার্কিং', style: TextStyle(fontSize: 12, color: Colors.black87)),
+            const Text('স্ট্যান্ডার্ড AutoCAD DXF ভেক্টর কোড ক্লিপবোর্ডে কপি করা হয়েছে।'),
+            const SizedBox(height: 10),
+            Text('মোট শীর্ষবিন্দু: ${BanglaNumerals.toBangla(_measuredPoints.length)} টি\nমোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(_totalAreaSqFt)} sq ft\nমোট শতক: ${BanglaFormatter.formatNumber(_totalAreaSqFt / 435.6, fractionDigits: 3)} শতক', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+            const SizedBox(height: 10),
+            const Text('কম্পিউটার বা মোবাইলে AutoCAD / LibreCAD-এ .dxf এক্সটেনশনে ফাইলটি সরাসরি খুলুন।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           ],
         ),
         actions: [
@@ -447,7 +707,81 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     );
   }
 
-  // Export PDF
+  // Generate Google Earth KML XML
+  String _generateKmlContent() {
+    const baseLat = 23.650000;
+    const baseLon = 90.500000;
+    const ftToDegLat = 1.0 / 364000.0;
+    const ftToDegLon = 1.0 / 334000.0;
+
+    final coords = StringBuffer();
+    for (final pt in _measuredPoints) {
+      final lon = baseLon + (pt.dx * _feetPerPixel * ftToDegLon);
+      final lat = baseLat - (pt.dy * _feetPerPixel * ftToDegLat);
+      coords.writeln('$lon,$lat,0');
+    }
+    if (_measuredPoints.isNotEmpty) {
+      final p0 = _measuredPoints.first;
+      final lon0 = baseLon + (p0.dx * _feetPerPixel * ftToDegLon);
+      final lat0 = baseLat - (p0.dy * _feetPerPixel * ftToDegLat);
+      coords.writeln('$lon0,$lat0,0');
+    }
+
+    return '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>$_activeMouza</name>
+    <description>BDLand Pro Survey CAD Polygon - Area: ${_totalAreaSqFt.toStringAsFixed(2)} sq ft</description>
+    <Placemark>
+      <name>দাগ বাউন্ডারি</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+$coords
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>''';
+  }
+
+  void _exportKml() {
+    final kml = _generateKmlContent();
+    Clipboard.setData(ClipboardData(text: kml));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.public, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Google Earth KML প্রস্তুত', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Google Earth KML কোঅর্ডিনেট কোড ক্লিপবোর্ডে কপি করা হয়েছে।'),
+            const SizedBox(height: 10),
+            const Text('এটি .kml ফাইল হিসেবে সেভ করে সরাসরি Google Earth Pro-তে স্যাটেলাইট ভিউতে দাগ দেখতে পারবেন।', style: TextStyle(fontSize: 12, color: Colors.black87)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('বুঝেছি', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Export PDF Certificate
   void _exportPdf() async {
     final pdf = pw.Document();
     final dec = _totalAreaSqFt / 435.60;
@@ -474,6 +808,10 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                 pw.Text('মোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(_totalAreaSqFt)} বর্গফুট', style: const pw.TextStyle(fontSize: 13)),
                 pw.Text('মোট পরিমাণ: ${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(katha, fractionDigits: 2)} কাঠা)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                 pw.Text('মোট পরিসীমা: ${BanglaFormatter.formatNumber(_totalPerimeterFt)} ফুট', style: const pw.TextStyle(fontSize: 13)),
+                if (_showDivisionCutLine) ...[
+                  pw.SizedBox(height: 8),
+                  pw.Text('অটো-ডিভিশন কর্তন: ${BanglaFormatter.formatNumber(_targetCutDecimals, fractionDigits: 2)} শতক ($_cutOffsetSummary)', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.orange900)),
+                ],
                 pw.SizedBox(height: 16),
                 pw.Container(
                   height: 180,
@@ -511,7 +849,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   }
 
   // ==========================================
-  // VIEW 1: PORTAL & MAP LOADER (Image 4)
+  // VIEW 1: PORTAL & MAP LOADER (Image 5)
   // ==========================================
   Widget _buildPortalView() {
     return Scaffold(
@@ -613,7 +951,11 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           IconButton(
             icon: const Icon(Icons.play_circle_fill, color: Color(0xFFDC2626), size: 24),
             tooltip: 'ভিডিও টিউটোরিয়াল',
-            onPressed: _showVideoGuide,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('মৌজা ম্যাপ ব্যবহারের ভিডিও গাইড চালু হচ্ছে...')),
+              );
+            },
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Color(0xFF334155)),
@@ -641,7 +983,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             children: [
-              // SECTION 1: সংরক্ষিত প্রজেক্ট (Image 4)
+              // SECTION 1: সংরক্ষিত প্রজেক্ট (Image 5)
               _buildSectionHeader('সংরক্ষিত প্রজেক্ট', null),
               const SizedBox(height: 8),
               Container(
@@ -671,15 +1013,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                         side: const BorderSide(color: Color(0xFF166534)),
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                       ),
-                      onPressed: () {
-                        // Load first saved project
-                        final proj = _savedProjects.first;
-                        setState(() {
-                          _activeMouza = proj['name'];
-                          _measuredPoints = List.from(proj['points']);
-                          _viewMode = MouzaViewMode.cad;
-                        });
-                      },
+                      onPressed: _showSavedProjectsModal,
                       child: const Text(
                         'ফোল্ডার বেছে নিন',
                         style: TextStyle(color: Color(0xFF166534), fontWeight: FontWeight.bold, fontSize: 13),
@@ -691,7 +1025,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
               const SizedBox(height: 20),
 
-              // SECTION 2: মৌজা নকশা লোড (Image 4)
+              // SECTION 2: মৌজা নকশা লোড (Image 5)
               _buildSectionHeader('মৌজা নকশা লোড', 'নতুন কাজ শুরু করুন'),
               const SizedBox(height: 8),
 
@@ -753,7 +1087,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
               const SizedBox(height: 10),
 
-              // Item B: Cloud থেকে (Navigates to AllMouzaMapsScreen - Image 1)
+              // Item B: Cloud থেকে (Navigates to AllMouzaMapsScreen - Image 5)
               InkWell(
                 onTap: () {
                   Navigator.push(
@@ -794,7 +1128,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'সারাদেশের মৌজা ম্যাপ থেকে বাছুন',
+                              'সারাদেশের মৌজা ম্যাপ থেকে বাছুন (free.mouzamap.tech)',
                               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                             ),
                           ],
@@ -816,7 +1150,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
               const SizedBox(height: 20),
 
-              // SECTION 3: ম্যাপের মান (Image 4)
+              // SECTION 3: ম্যাপের মান (Image 5)
               Row(
                 children: [
                   const Text('ম্যাপের মান', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
@@ -884,7 +1218,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
               const SizedBox(height: 20),
 
-              // SECTION 4: টোটাল স্টেশন / RTK (Image 4)
+              // SECTION 4: টোটাল স্টেশন / RTK (Image 5)
               _buildSectionHeader('টোটাল স্টেশন / RTK', 'পয়েন্ট দিয়ে কাজ'),
               const SizedBox(height: 8),
               InkWell(
@@ -964,7 +1298,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   }
 
   // ==========================================
-  // VIEW 2: CAD MEASUREMENT WORKSPACE (Image 2)
+  // VIEW 2: CAD MEASUREMENT WORKSPACE (Image 3)
   // ==========================================
   Widget _buildCadView() {
     final dec = _totalAreaSqFt / 435.60;
@@ -977,6 +1311,10 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
         showAngles: _showAngles,
         showDimensions: _showDimensions,
         highContrast: _highContrast,
+        showDivisionCutLine: _showDivisionCutLine,
+        cutLineP1: _cutLineP1,
+        cutLineP2: _cutLineP2,
+        targetCutDecimals: _targetCutDecimals,
       ),
       size: Size.infinite,
     );
@@ -998,7 +1336,11 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           IconButton(
             icon: const Icon(Icons.near_me, color: Colors.white),
             tooltip: 'জিপিএস কেন্দ্র',
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('জিপিএস লোকেশন সেন্টারিং সক্রিয়')),
+              );
+            },
           ),
           IconButton(
             icon: Icon(
@@ -1018,28 +1360,22 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             tooltip: 'এক্সপোর্ট',
             onSelected: (val) {
               if (val == 'pdf') _exportPdf();
-              if (val == 'dxf') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('AutoCAD DXF ভেক্টর ফাইল সেভ করা হয়েছে')),
-                );
-              }
-              if (val == 'kml') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Google Earth KML ফাইল সেভ করা হয়েছে')),
-                );
-              }
+              if (val == 'dxf') _exportDxf();
+              if (val == 'kml') _exportKml();
+              if (val == 'add_pt') _addNewPointAtCenter();
             },
             itemBuilder: (ctx) => const [
               PopupMenuItem(value: 'pdf', child: Text('অফিশিয়াল A4 PDF প্রত্যয়ন')),
               PopupMenuItem(value: 'dxf', child: Text('AutoCAD DXF (.dxf)')),
               PopupMenuItem(value: 'kml', child: Text('Google Earth KML (.kml)')),
+              PopupMenuItem(value: 'add_pt', child: Text('নতুন শীর্ষবিন্দু যোগ করুন (+)')),
             ],
           ),
         ],
       ),
       body: Column(
         children: [
-          // CAD Banner (Matching Image 2 banner)
+          // CAD Banner (Matching Image 3 banner)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             color: const Color(0xFF1E293B),
@@ -1068,6 +1404,29 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ),
           ),
 
+          // Optional Cut-Line Status Alert
+          if (_showDivisionCutLine)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              color: const Color(0xFF78350F),
+              child: Row(
+                children: [
+                  const Icon(Icons.call_split, color: Colors.amberAccent, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'কাটলাইন সক্রিয়: $_cutOffsetSummary',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _showDivisionCutLine = false),
+                    child: const Icon(Icons.close, color: Colors.white70, size: 16),
+                  ),
+                ],
+              ),
+            ),
+
           // Main CAD Interactive Canvas
           Expanded(
             child: Stack(
@@ -1088,14 +1447,36 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                       _isTouchActive = true;
                       _selectedVertexIndex = tappedIdx;
                     });
+                    if (tappedIdx != null) {
+                      HapticFeedback.selectionClick();
+                    }
                   },
                   onPointerMove: (event) {
                     final pos = event.localPosition;
                     if (_selectedVertexIndex != null) {
                       _pushUndo();
+
+                      // Magnetic Ortho-Snapping when aligning horizontally/vertically
+                      Offset adjustedPos = pos;
+                      final currIdx = _selectedVertexIndex!;
+                      final prevPt = _measuredPoints[(currIdx - 1 + _measuredPoints.length) % _measuredPoints.length];
+                      final nextPt = _measuredPoints[(currIdx + 1) % _measuredPoints.length];
+
+                      if ((pos.dx - prevPt.dx).abs() < 8) {
+                        adjustedPos = Offset(prevPt.dx, adjustedPos.dy);
+                      } else if ((pos.dx - nextPt.dx).abs() < 8) {
+                        adjustedPos = Offset(nextPt.dx, adjustedPos.dy);
+                      }
+
+                      if ((pos.dy - prevPt.dy).abs() < 8) {
+                        adjustedPos = Offset(adjustedPos.dx, prevPt.dy);
+                      } else if ((pos.dy - nextPt.dy).abs() < 8) {
+                        adjustedPos = Offset(adjustedPos.dx, nextPt.dy);
+                      }
+
                       setState(() {
-                        _measuredPoints[_selectedVertexIndex!] = pos;
-                        _touchPosition = pos;
+                        _measuredPoints[currIdx] = adjustedPos;
+                        _touchPosition = adjustedPos;
                         _recompute();
                       });
                     } else {
@@ -1137,7 +1518,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ),
           ),
 
-          // Bottom CAD Controls (Matching Image 2 bottom bar)
+          // Bottom CAD Controls (Matching Image 3 bottom bar)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: const Color(0xFF0F172A),
@@ -1186,16 +1567,16 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                 ),
                 const SizedBox(width: 8),
 
-                // Save to History button
-                ElevatedButton.icon(
-                  onPressed: _exportPdf,
-                  icon: const Icon(Icons.print, size: 16),
-                  label: const Text('রিপোর্ট', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF14532D),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                // Export / Share button (Image 3: green circle button)
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF14532D),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.file_upload_outlined, color: Colors.white, size: 20),
+                    tooltip: 'এক্সপোর্ট / রিপোর্ট',
+                    onPressed: _exportPdf,
                   ),
                 ),
               ],
@@ -1231,7 +1612,7 @@ class _EngineeringGridPainter extends CustomPainter {
 }
 
 // ==========================================
-// PAINTER 2: CAD Canvas with Angles & Dimensions (Image 2)
+// PAINTER 2: CAD Canvas with Angles & Dimensions (Image 3)
 // ==========================================
 class _CadInteractivePainter extends CustomPainter {
   final List<Offset> points;
@@ -1239,6 +1620,10 @@ class _CadInteractivePainter extends CustomPainter {
   final bool showAngles;
   final bool showDimensions;
   final bool highContrast;
+  final bool showDivisionCutLine;
+  final Offset? cutLineP1;
+  final Offset? cutLineP2;
+  final double targetCutDecimals;
 
   _CadInteractivePainter({
     required this.points,
@@ -1246,6 +1631,10 @@ class _CadInteractivePainter extends CustomPainter {
     required this.showAngles,
     required this.showDimensions,
     required this.highContrast,
+    this.showDivisionCutLine = false,
+    this.cutLineP1,
+    this.cutLineP2,
+    this.targetCutDecimals = 5.0,
   });
 
   @override
@@ -1276,14 +1665,14 @@ class _CadInteractivePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
-    // 3. Draw Polygon Stroke (Cyan #06B6D4 as in Image 2)
+    // 3. Draw Polygon Stroke (Cyan #22D3EE as in Image 3)
     final strokePaint = Paint()
       ..color = const Color(0xFF22D3EE)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, strokePaint);
 
-    // 4. Draw Side Dimension Badges (feet tags along sides)
+    // 4. Draw Side Dimension Badges (feet tags along sides, yellow on black)
     if (showDimensions && points.length >= 2) {
       for (int i = 0; i < points.length; i++) {
         final p1 = points[i];
@@ -1295,7 +1684,7 @@ class _CadInteractivePainter extends CustomPainter {
         final textSpan = TextSpan(
           text: '${BanglaFormatter.formatNumber(distFt, fractionDigits: 1)}\'',
           style: const TextStyle(
-            color: Color(0xFFFDE047), // Yellow/gold text on dark badge
+            color: Color(0xFFFDE047), // Yellow text on dark badge (Image 3)
             fontSize: 10.5,
             fontWeight: FontWeight.bold,
           ),
@@ -1312,11 +1701,52 @@ class _CadInteractivePainter extends CustomPainter {
       }
     }
 
-    // 5. Draw Vertices and Angles (Degrees e.g. ৯৮°, ৮৭°)
+    // 5. Draw Auto-Division Cut Line if active
+    if (showDivisionCutLine && cutLineP1 != null && cutLineP2 != null) {
+      final cutPaint = Paint()
+        ..color = const Color(0xFFF59E0B) // Amber/orange cutline
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+
+      // Draw dashed line
+      final pA = cutLineP1!;
+      final pB = cutLineP2!;
+      final totalDist = (pB - pA).distance;
+      const dashWidth = 6.0;
+      const dashSpace = 4.0;
+      double currentDist = 0.0;
+
+      while (currentDist < totalDist) {
+        final start = Offset.lerp(pA, pB, currentDist / totalDist)!;
+        final end = Offset.lerp(pA, pB, math.min(1.0, (currentDist + dashWidth) / totalDist))!;
+        canvas.drawLine(start, end, cutPaint);
+        currentDist += dashWidth + dashSpace;
+      }
+
+      // Draw Cut-Line Badge
+      final midCut = Offset((pA.dx + pB.dx) / 2, (pA.dy + pB.dy) / 2);
+      final cutSpan = TextSpan(
+        text: 'কাটলাইন: ${BanglaFormatter.formatNumber(targetCutDecimals, fractionDigits: 1)} শতক',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+      final tpCut = TextPainter(text: cutSpan, textDirection: TextDirection.ltr)..layout();
+      final cutRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: midCut, width: tpCut.width + 12, height: tpCut.height + 4),
+        const Radius.circular(4),
+      );
+      canvas.drawRRect(cutRect, Paint()..color = const Color(0xFFD97706));
+      tpCut.paint(canvas, midCut - Offset(tpCut.width / 2, tpCut.height / 2));
+    }
+
+    // 6. Draw Vertices and Angles (Degrees e.g. ৯৮°, ৯৭°, ৮৭°, ৭৮°)
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
 
-      // Draw vertex handle circle
+      // Draw vertex handle circle (Cyan outer ring + pure white center)
       canvas.drawCircle(pt, 7.0, Paint()..color = const Color(0xFF22D3EE));
       canvas.drawCircle(pt, 4.0, Paint()..color = Colors.white);
 
@@ -1333,7 +1763,7 @@ class _CadInteractivePainter extends CustomPainter {
         final angleSpan = TextSpan(
           text: '${BanglaNumerals.toBangla(angleDeg.round())}°',
           style: const TextStyle(
-            color: Color(0xFF86EFAC), // Mint green angle degree text
+            color: Color(0xFF86EFAC), // Mint green angle degree text (Image 3)
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),

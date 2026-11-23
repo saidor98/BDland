@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/mouza_cloud_service.dart';
 import '../02_mouza_simple/mouza_map_simple_screen.dart';
 import '../widgets/digital_gunia_scale.dart';
 
@@ -13,7 +15,7 @@ class MouzaDirectoryItem {
   final String upazila;
   final String mouzaName;
   final String jlNo;
-  final String surveyType; // CS, SA, RS, BS
+  final String surveyType; // CS, SA, RS, BS, City
   final int totalSheets;
   final int totalPlots;
 
@@ -37,26 +39,27 @@ class AllMouzaMapsScreen extends StatefulWidget {
 }
 
 class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
+  // Page 3 Tab & Source States
+  int _activeTopTab = 0; // 0: সকল ম্যাপ, 1: প্রিয় ম্যাপ, 2: সেভ ম্যাপ
+  int _activeSource = 1; // 1: সোর্স ১ (free.mouzamap.tech), 2: সোর্স ২, 3: সোর্স ৩
+
+  int _selectedDriveIndex = 0; // 0: Dhaka
+  String _currentDivisionName = 'ঢাকা';
+  String _currentPath = '';
+  final List<String> _pathHistory = [];
+
+  bool _isLoading = false;
+  List<MouzaCloudItem> _cloudItems = [];
   String _searchQuery = '';
-  String _selectedDivision = 'সকল বিভাগ';
 
-  final List<String> _divisions = [
-    'সকল বিভাগ',
-    'ঢাকা',
-    'চট্টগ্রাম',
-    'রাজশাহী',
-    'খুলনা',
-    'বরিশাল',
-    'সিলেট',
-    'রংপুর',
-    'ময়মনসিংহ',
-  ];
+  final MouzaCloudService _cloudService = MouzaCloudService();
 
-  final List<MouzaDirectoryItem> _mouzaList = const [
+  // Static fallback catalog for high-speed offline search
+  final List<MouzaDirectoryItem> _mouzaCatalog = const [
     MouzaDirectoryItem(
       division: 'ঢাকা',
       district: 'ঢাকা',
-      upazila: 'ধানমন্ডি / মোহাম্মদপুর',
+      upazila: 'ধানমন্ডি',
       mouzaName: 'জাফরাবাদ',
       jlNo: '১২২',
       surveyType: 'RS / City Survey',
@@ -124,16 +127,6 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
       totalPlots: 1100,
     ),
     MouzaDirectoryItem(
-      division: 'সিলেট',
-      district: 'মৌলভীবাজার',
-      upazila: 'শ্রীমঙ্গল',
-      mouzaName: 'কালাপুর',
-      jlNo: '২৩',
-      surveyType: 'CS / SA',
-      totalSheets: 3,
-      totalPlots: 920,
-    ),
-    MouzaDirectoryItem(
       division: 'রাজশাহী',
       district: 'বগুড়া',
       upazila: 'শেরপুর',
@@ -144,16 +137,6 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
       totalPlots: 890,
     ),
     MouzaDirectoryItem(
-      division: 'রাজশাহী',
-      district: 'রাজশাহী',
-      upazila: 'পবা',
-      mouzaName: 'নওহাটা',
-      jlNo: '৪৫',
-      surveyType: 'CS / RS',
-      totalSheets: 5,
-      totalPlots: 1750,
-    ),
-    MouzaDirectoryItem(
       division: 'খুলনা',
       district: 'যশোর',
       upazila: 'ঝিকরগাছা',
@@ -162,16 +145,6 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
       surveyType: 'RS',
       totalSheets: 4,
       totalPlots: 1450,
-    ),
-    MouzaDirectoryItem(
-      division: 'খুলনা',
-      district: 'কুষ্টিয়া',
-      upazila: 'কুমারখালী',
-      mouzaName: 'শিলাইদহ',
-      jlNo: '১৬',
-      surveyType: 'CS / SA / RS',
-      totalSheets: 4,
-      totalPlots: 1200,
     ),
     MouzaDirectoryItem(
       division: 'বরিশাল',
@@ -205,17 +178,83 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
     ),
   ];
 
-  List<MouzaDirectoryItem> get _filteredList {
-    return _mouzaList.where((item) {
-      final matchesDiv = _selectedDivision == 'সকল বিভাগ' || item.division == _selectedDivision;
-      final q = _searchQuery.toLowerCase();
-      final matchesSearch = q.isEmpty ||
-          item.mouzaName.toLowerCase().contains(q) ||
-          item.district.toLowerCase().contains(q) ||
-          item.upazila.toLowerCase().contains(q) ||
-          item.jlNo.contains(q);
-      return matchesDiv && matchesSearch;
-    }).toList();
+  @override
+  void initState() {
+    super.initState();
+    _loadDirectory();
+  }
+
+  Future<void> _loadDirectory() async {
+    setState(() => _isLoading = true);
+    final items = await _cloudService.fetchDirectory(
+      driveIndex: _selectedDriveIndex,
+      path: _currentPath,
+    );
+    if (mounted) {
+      setState(() {
+        _cloudItems = items;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onDivisionSelected(Map<String, dynamic> div) {
+    setState(() {
+      _selectedDriveIndex = div['drive'] as int;
+      _currentDivisionName = div['name'] as String;
+      _currentPath = '';
+      _pathHistory.clear();
+      _searchQuery = '';
+    });
+    _loadDirectory();
+  }
+
+  void _onItemTapped(MouzaCloudItem item) {
+    if (item.isFolder) {
+      setState(() {
+        _pathHistory.add(_currentPath);
+        _currentPath = item.path;
+      });
+      _loadDirectory();
+    } else {
+      // It's a real mouza map PDF sheet! Open the Cadastral Sheet Viewer
+      _openCadastralViewerFromCloud(item);
+    }
+  }
+
+  void _navigateBackPath() {
+    if (_pathHistory.isNotEmpty) {
+      setState(() {
+        _currentPath = _pathHistory.removeLast();
+      });
+      _loadDirectory();
+    } else if (_currentPath.isNotEmpty) {
+      setState(() {
+        _currentPath = '';
+      });
+      _loadDirectory();
+    }
+  }
+
+  void _openCadastralViewerFromCloud(MouzaCloudItem file) {
+    // Extract sheet and mouza name from file title
+    final cleanName = file.name
+        .replaceAll(' - (www.mouzamap.tech).pdf', '')
+        .replaceAll('.pdf', '')
+        .replaceAll('_result_result', '');
+
+    final dummyItem = MouzaDirectoryItem(
+      division: _currentDivisionName,
+      district: _currentPath.split('/').isNotEmpty ? _currentPath.split('/')[0] : 'ঢাকা',
+      upazila: _currentPath.split('/').length > 1 ? _currentPath.split('/')[1] : 'সদর',
+      mouzaName: cleanName,
+      jlNo: '৩৪',
+      surveyType: _currentPath.contains('RS') ? 'RS' : 'CS / RS',
+      totalSheets: 3,
+      totalPlots: 850,
+    );
+
+    _openCadastralViewer(dummyItem);
   }
 
   void _openCadastralViewer(MouzaDirectoryItem item) {
@@ -227,128 +266,414 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
     );
   }
 
+  IconData _getDivisionIcon(String iconKey) {
+    switch (iconKey) {
+      case 'building':
+        return Icons.apartment;
+      case 'ship':
+        return Icons.directions_boat;
+      case 'forest':
+        return Icons.park;
+      case 'eco':
+        return Icons.eco;
+      case 'waves':
+        return Icons.waves;
+      case 'landscape':
+        return Icons.terrain;
+      case 'agriculture':
+        return Icons.agriculture;
+      case 'grass':
+        return Icons.yard;
+      default:
+        return Icons.map;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filteredItems = _cloudItems.where((item) {
+      if (_searchQuery.isEmpty) return true;
+      return item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A), // Deep dark theme matching Page 3
       appBar: AppBar(
-        title: const Text('সারাদেশের সকল মৌজা ম্যাপ (MouzaMap Hub)'),
+        backgroundColor: const Color(0xFF6B21A8), // Purple header matching Page 3
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'মৌজা ম্যাপ',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            Text(
+              'সারাদেশের সকল মৌজা ম্যাপ (free.mouzamap.tech)',
+              style: TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            tooltip: 'সাহায্য',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('মৌজা ম্যাপ সংগ্রহ ও ব্যবহার'),
+                  content: const Text('১. আপনার বিভাগ নির্বাচন করুন।\n২. জেলা ও উপজেলা ফোল্ডারে প্রবেশ করে আপনার কাঙ্ক্ষিত মৌজা শিট নির্বাচন করুন।\n৩. "নকশায় জমি মাপুন" বাটনে চাপ দিয়ে সরাসরি CAD পরিমাপে যান।'),
+                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি'))],
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent),
+            tooltip: 'ভিডিও গাইড',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('মৌজা ম্যাপ ব্যবহারের পূর্ণাঙ্গ ভিডিও টিউটোরিয়াল চালু হচ্ছে...')),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Filter & Search Header
+          // 1. TOP TABS: সকল ম্যাপ | প্রিয় ম্যাপ | সেভ ম্যাপ (Matching Page 3)
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
+            color: const Color(0xFF6B21A8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
               children: [
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'মৌজার নাম, জেলা, উপজেলা বা জে.এল নং দিয়ে খুঁজুন...',
-                    prefixIcon: const Icon(Icons.search),
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                _buildTopTabItem(0, 'সকল ম্যাপ', Icons.folder_copy_outlined),
+                const SizedBox(width: 8),
+                _buildTopTabItem(1, 'প্রিয় ম্যাপ', Icons.favorite_border),
+                const SizedBox(width: 8),
+                _buildTopTabItem(2, 'সেভ ম্যাপ', Icons.bookmark_border),
+              ],
+            ),
+          ),
+
+          // 2. SOURCE PILLS: সোর্স ১ | সোর্স ২ | সোর্স ৩ (Matching Page 3)
+          Container(
+            color: const Color(0xFF1E1B4B),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                _buildSourcePill(1, 'সোর্স ১', Icons.auto_stories),
+                const SizedBox(width: 8),
+                _buildSourcePill(2, 'সোর্স ২', Icons.cloud_outlined),
+                const SizedBox(width: 8),
+                _buildSourcePill(3, 'সোর্স ৩', Icons.public),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(14),
+              children: [
+                // 3. SECTION: আপনার বিভাগ নির্বাচন করুন (Page 3)
+                const Text(
+                  'আপনার বিভাগ নির্বাচন করুন',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFCBD5E1),
                   ),
-                  onChanged: (val) => setState(() => _searchQuery = val),
                 ),
                 const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _divisions.map((div) {
-                      final isSelected = _selectedDivision == div;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6.0),
-                        child: ChoiceChip(
-                          label: Text(div),
-                          selected: isSelected,
-                          selectedColor: AppColors.primaryGreen,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black87,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+
+                // 8 DIVISION GRID (Page 3)
+                GridView.count(
+                  crossAxisCount: 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1.15,
+                  children: MouzaCloudService.divisions.map((div) {
+                    final isSel = _selectedDriveIndex == div['drive'];
+                    return InkWell(
+                      onTap: () => _onDivisionSelected(div),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFF8B5CF6) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSel ? const Color(0xFFA78BFA) : const Color(0xFF334155),
+                            width: 1.2,
                           ),
-                          onSelected: (_) => setState(() => _selectedDivision = div),
+                          boxShadow: isSel
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF8B5CF6).withOpacity(0.35),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _getDivisionIcon(div['icon'] as String),
+                              size: 26,
+                              color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              div['name'] as String,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isSel ? Colors.white : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 4. SEARCH INPUT (Page 3: ফাইল খুঁজুন...)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: TextField(
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'ফাইল খুঁজুন...',
+                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8)),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Color(0xFF94A3B8), size: 18),
+                              onPressed: () => setState(() => _searchQuery = ''),
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // 5. BREADCRUMB NAVIGATION (Page 3: <- -> ঢাকা)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, size: 18, color: Colors.white),
+                        tooltip: 'উপরে যান',
+                        onPressed: _currentPath.isNotEmpty ? _navigateBackPath : null,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _currentPath.isEmpty ? _currentDivisionName : '$_currentDivisionName / $_currentPath',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF38BDF8), // Cyan link color
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      if (_isLoading)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // 6. FOLDER & FILE LIST (Page 3)
+                if (filteredItems.isEmpty && !_isLoading)
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(Icons.folder_open, size: 48, color: Color(0xFF475569)),
+                          const SizedBox(height: 8),
+                          Text(
+                            _searchQuery.isEmpty ? 'এই ফোল্ডারে কোনো ফাইল নেই' : 'কোনো ফলাফল পাওয়া যায়নি',
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, idx) {
+                      final item = filteredItems[idx];
+                      return Material(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () => _onItemTapped(item),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            child: Row(
+                              children: [
+                                // Folder / PDF Icon
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: item.isFolder
+                                        ? const Color(0xFF6B21A8).withOpacity(0.3)
+                                        : const Color(0xFFDC2626).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    item.isFolder ? Icons.folder : Icons.picture_as_pdf,
+                                    color: item.isFolder ? const Color(0xFFA855F7) : const Color(0xFFEF4444),
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        item.isFolder
+                                            ? '১৩ সেপ্টেম্বর ২০২৫ • ডিরেক্টরি'
+                                            : '${item.size != null ? "${(item.size! / (1024 * 1024)).toStringAsFixed(1)} MB" : "PDF নকশা"} • ক্যাডাস্ট্রাল ভেক্টর',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 14,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       );
-                    }).toList(),
+                    },
                   ),
-                ),
               ],
-            ),
-          ),
-
-          // Total Stats Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppColors.primaryGreenLight,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'মোট অন্তর্ভুক্ত মৌজা: ${BanglaNumerals.toBangla(_filteredList.length)} টি',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark),
-                ),
-                const Text(
-                  'CS / SA / RS / BS ডিজিটাল জরিপ',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
-
-          // Mouza List
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(12.0),
-              itemCount: _filteredList.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, idx) {
-                final item = _filteredList[idx];
-                return Card(
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    leading: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.map_outlined, color: AppColors.primaryGreen),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(
-                          item.mouzaName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'JL: ${item.jlNo}',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '${item.upazila}, ${item.district} | জরিপ: ${item.surveyType}\nশিট সংখ্যা: ${BanglaNumerals.toBangla(item.totalSheets)} টি | মোট প্লট: ${BanglaNumerals.toBangla(item.totalPlots)} টি',
-                      style: const TextStyle(fontSize: 12.5),
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.primaryGreen),
-                    onTap: () => _openCadastralViewer(item),
-                  ),
-                );
-              },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopTabItem(int index, String label, IconData icon) {
+    final isSel = _activeTopTab == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _activeTopTab = index),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFF8B5CF6) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: isSel ? Colors.white : Colors.white70),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                  color: isSel ? Colors.white : Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourcePill(int sourceNum, String label, IconData icon) {
+    final isSel = _activeSource == sourceNum;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() => _activeSource = sourceNum);
+          _loadDirectory();
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFF8B5CF6) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isSel ? const Color(0xFFA78BFA) : const Color(0xFF475569)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: isSel ? Colors.white : const Color(0xFF94A3B8)),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                  color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -366,7 +691,74 @@ class _CadastralSheetModal extends StatefulWidget {
 class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   int _selectedSheetIndex = 1;
   bool _showGunia = false;
-  String? _selectedDagInfo;
+  int _selectedPlotIndex = 4; // Default to Dag 105 (Area: 33,000 sq ft, 75.758 dec)
+  String? _selectedDagInfo = 'দাগ ১০৫ নির্বাচিত | খতিয়ান নং: ১২ | আনুমানিক: ৭৫.৭৫৮ শতক (৩৩,০০০ sq ft)';
+
+  static const List<List<Offset>> _plotPolygons = [
+    // Top Left Plots (101, 102, 103)
+    [Offset(30, 40), Offset(150, 40), Offset(140, 140), Offset(30, 130)],
+    [Offset(150, 40), Offset(280, 40), Offset(270, 140), Offset(140, 140)],
+    [Offset(280, 40), Offset(420, 40), Offset(400, 140), Offset(270, 140)],
+
+    // Mid Plots above river (104, 105, 106)
+    [Offset(30, 130), Offset(140, 140), Offset(130, 210), Offset(30, 200)],
+    [Offset(140, 140), Offset(270, 140), Offset(260, 215), Offset(130, 210)], // 105
+    [Offset(270, 140), Offset(400, 140), Offset(420, 220), Offset(260, 215)],
+
+    // Bottom Plots below river (107, 108, 109)
+    [Offset(40, 260), Offset(160, 265), Offset(150, 360), Offset(40, 350)],
+    [Offset(160, 265), Offset(290, 275), Offset(280, 370), Offset(150, 360)],
+    [Offset(290, 275), Offset(440, 280), Offset(430, 375), Offset(280, 370)],
+
+    // Very Bottom Plots (110, 111, 112)
+    [Offset(40, 350), Offset(150, 360), Offset(140, 460), Offset(40, 450)],
+    [Offset(150, 360), Offset(280, 370), Offset(270, 465), Offset(140, 460)],
+    [Offset(280, 370), Offset(430, 375), Offset(420, 470), Offset(270, 465)],
+  ];
+
+  void _onMapTapped(Offset localPos) {
+    for (int i = 0; i < _plotPolygons.length; i++) {
+      final poly = _plotPolygons[i];
+      if (_isPointInsidePolygon(localPos, poly)) {
+        final dagNo = 101 + i;
+        setState(() {
+          _selectedPlotIndex = i;
+          if (dagNo == 105) {
+            _selectedDagInfo = 'দাগ ১০৫ নির্বাচিত | খতিয়ান নং: ১২ | আনুমানিক: ৭৫.৭৫৮ শতক (৩৩,০০০ sq ft)';
+          } else {
+            final approxDec = (20.0 + (i * 4.7)).toStringAsFixed(3);
+            _selectedDagInfo = 'দাগ ${BanglaNumerals.toBangla(dagNo)} নির্বাচিত | খতিয়ান নং: ${BanglaNumerals.toBangla(i + 8)} | আনুমানিক: $approxDec শতক';
+          }
+        });
+        break;
+      }
+    }
+  }
+
+  bool _isPointInsidePolygon(Offset point, List<Offset> poly) {
+    bool inside = false;
+    for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      if (((poly[i].dy > point.dy) != (poly[j].dy > point.dy)) &&
+          (point.dx < (poly[j].dx - poly[i].dx) * (point.dy - poly[i].dy) / (poly[j].dy - poly[i].dy) + poly[i].dx)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  List<Offset> _getNormalizedCadPoints() {
+    if (_selectedPlotIndex == 4) {
+      // Dag 105 exact points matching Image 3 (Area: 33,000 sq ft, 75.758 decimal)
+      return const [
+        Offset(60, 60),
+        Offset(260, 60),
+        Offset(280, 220),
+        Offset(40, 200),
+      ];
+    }
+    final raw = _plotPolygons[_selectedPlotIndex];
+    return raw.map((p) => Offset((p.dx - 20) * 0.8 + 40, (p.dy - 20) * 0.7 + 50)).toList();
+  }
 
   void _downloadMapPdf() async {
     final pdf = pw.Document();
@@ -429,9 +821,9 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
           // Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primaryGreen,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -531,11 +923,15 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                           ),
                         ],
                       ),
-                      child: CustomPaint(
-                        painter: _InteractiveMouzaPainter(
-                          mouzaName: widget.item.mouzaName,
-                          sheetNo: _selectedSheetIndex,
-                          jlNo: widget.item.jlNo,
+                      child: GestureDetector(
+                        onTapUp: (details) => _onMapTapped(details.localPosition),
+                        child: CustomPaint(
+                          painter: _InteractiveMouzaPainter(
+                            mouzaName: widget.item.mouzaName,
+                            sheetNo: _selectedSheetIndex,
+                            jlNo: widget.item.jlNo,
+                            selectedPlotIndex: _selectedPlotIndex,
+                          ),
                         ),
                       ),
                     ),
@@ -617,12 +1013,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                             initialMouzaName: widget.item.mouzaName,
                             initialSheetNo: 'শিট ${BanglaNumerals.toBangla(_selectedSheetIndex)}',
                             initialJlNo: widget.item.jlNo,
-                            initialPoints: const [
-                              Offset(70, 70),
-                              Offset(240, 65),
-                              Offset(260, 210),
-                              Offset(60, 200),
-                            ],
+                            initialPoints: _getNormalizedCadPoints(),
                           ),
                         ),
                       );
@@ -649,11 +1040,13 @@ class _InteractiveMouzaPainter extends CustomPainter {
   final String mouzaName;
   final int sheetNo;
   final String jlNo;
+  final int selectedPlotIndex;
 
   _InteractiveMouzaPainter({
     required this.mouzaName,
     required this.sheetNo,
     required this.jlNo,
+    this.selectedPlotIndex = 4,
   });
 
   @override
@@ -669,7 +1062,7 @@ class _InteractiveMouzaPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    // 2. Road passing through mouza
+    // 2. Road/River passing through mouza
     final roadPaint = Paint()
       ..color = const Color(0xFFD1C7B7)
       ..strokeWidth = 26
@@ -691,36 +1084,32 @@ class _InteractiveMouzaPainter extends CustomPainter {
       ..strokeWidth = 1.6
       ..style = PaintingStyle.stroke;
 
-    final plots = [
-      // Top Left Plots
-      [const Offset(30, 40), const Offset(150, 40), const Offset(140, 140), const Offset(30, 130)],
-      [const Offset(150, 40), const Offset(280, 40), const Offset(270, 140), const Offset(140, 140)],
-      [const Offset(280, 40), const Offset(420, 40), const Offset(400, 140), const Offset(270, 140)],
-
-      // Mid Plots (above road)
-      [const Offset(30, 130), const Offset(140, 140), const Offset(130, 210), const Offset(30, 200)],
-      [const Offset(140, 140), const Offset(270, 140), const Offset(260, 215), const Offset(130, 210)],
-      [const Offset(270, 140), const Offset(400, 140), const Offset(420, 220), const Offset(260, 215)],
-
-      // Bottom Plots (below road)
-      [const Offset(40, 260), const Offset(160, 265), const Offset(150, 360), const Offset(40, 350)],
-      [const Offset(160, 265), const Offset(290, 275), const Offset(280, 370), const Offset(150, 360)],
-      [const Offset(290, 275), const Offset(440, 280), const Offset(430, 375), const Offset(280, 370)],
-
-      // Very Bottom Plots
-      [const Offset(40, 350), const Offset(150, 360), const Offset(140, 460), const Offset(40, 450)],
-      [const Offset(150, 360), const Offset(280, 370), const Offset(270, 465), const Offset(140, 460)],
-      [const Offset(280, 370), const Offset(430, 375), const Offset(420, 470), const Offset(270, 465)],
-    ];
+    final plots = _CadastralSheetModalState._plotPolygons;
 
     int dagIndex = 101;
-    for (final pList in plots) {
+    for (int i = 0; i < plots.length; i++) {
+      final pList = plots[i];
       final path = Path()..moveTo(pList[0].dx, pList[0].dy);
-      for (int i = 1; i < pList.length; i++) {
-        path.lineTo(pList[i].dx, pList[i].dy);
+      for (int k = 1; k < pList.length; k++) {
+        path.lineTo(pList[k].dx, pList[k].dy);
       }
       path.close();
-      canvas.drawPath(path, plotPaint);
+
+      // Highlight selected plot with cyan glow fill
+      if (i == selectedPlotIndex) {
+        final fillPaint = Paint()
+          ..color = const Color(0xFF06B6D4).withOpacity(0.25)
+          ..style = PaintingStyle.fill;
+        canvas.drawPath(path, fillPaint);
+
+        final selStroke = Paint()
+          ..color = const Color(0xFF0284C7)
+          ..strokeWidth = 2.4
+          ..style = PaintingStyle.stroke;
+        canvas.drawPath(path, selStroke);
+      } else {
+        canvas.drawPath(path, plotPaint);
+      }
 
       // Plot center
       double cx = 0, cy = 0;
@@ -731,7 +1120,13 @@ class _InteractiveMouzaPainter extends CustomPainter {
       cx /= pList.length;
       cy /= pList.length;
 
-      _drawText(canvas, 'দাগ ${BanglaNumerals.toBangla(dagIndex)}', Offset(cx - 18, cy - 6), isBold: true);
+      _drawText(
+        canvas,
+        'দাগ ${BanglaNumerals.toBangla(dagIndex)}',
+        Offset(cx - 18, cy - 6),
+        isBold: true,
+        color: i == selectedPlotIndex ? const Color(0xFF0369A1) : const Color(0xFF4A3B2C),
+      );
       dagIndex++;
     }
 
@@ -767,5 +1162,7 @@ class _InteractiveMouzaPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _InteractiveMouzaPainter oldDelegate) =>
-      oldDelegate.mouzaName != mouzaName || oldDelegate.sheetNo != sheetNo;
+      oldDelegate.mouzaName != mouzaName ||
+      oldDelegate.sheetNo != sheetNo ||
+      oldDelegate.selectedPlotIndex != selectedPlotIndex;
 }
