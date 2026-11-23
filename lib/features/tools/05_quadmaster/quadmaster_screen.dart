@@ -2,10 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
-import '../../../core/services/history_service.dart';
-import '../../history/models/calculation_history_item.dart';
 import '../../geometry/models/geometry_models.dart';
 import '../../geometry/services/geometry_calculator.dart';
 
@@ -89,7 +86,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     buffer.writeln('\n[আমিনের গড় পদ্ধতির সাথে তুলনা]');
     buffer.writeln('গড় পদ্ধতিতে ক্ষেত্রফল: ${BanglaFormatter.formatNumber(r.averageAreaDecimal, fractionDigits: 3)} শতক');
     buffer.writeln('পার্থক্য / ত্রুটি: ${BanglaFormatter.formatNumber(r.diffDecimal.abs(), fractionDigits: 3)} শতক (${BanglaFormatter.formatPercentage(r.percentageError)})');
-    buffer.writeln('\n[সমান ${_divisionParts} ভাগে বণ্টন]');
+    buffer.writeln('\n[সমান $_divisionParts ভাগে বণ্টন]');
     buffer.writeln('জনপ্রতি জমির পরিমাণ: ${BanglaFormatter.formatNumber(perPersonDec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(perPersonSqFt)} ft²)');
     buffer.writeln('জনপ্রতি কাঠা: ${BanglaFormatter.formatNumber(perPersonSqFt / 720.0, fractionDigits: 3)} কাঠা');
     buffer.writeln('\nঅ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
@@ -369,7 +366,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(14),

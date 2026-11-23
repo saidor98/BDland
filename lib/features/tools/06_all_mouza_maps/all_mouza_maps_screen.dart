@@ -55,7 +55,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
   final MouzaCloudService _cloudService = MouzaCloudService();
 
   // Static fallback catalog for high-speed offline search
-  final List<MouzaDirectoryItem> _mouzaCatalog = const [
+  static const List<MouzaDirectoryItem> mouzaCatalog = [
     MouzaDirectoryItem(
       division: 'ঢাকা',
       district: 'ঢাকা',
@@ -901,7 +901,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                   children: [
                     pw.Text('মৌজা: ${widget.item.mouzaName} (জে.এল. নং: ${widget.item.jlNo})',
                         style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                    pw.Text('জরিপ: ${widget.item.surveyType} | শিট নং: ${_selectedSheetIndex}'),
+                    pw.Text('জরিপ: ${widget.item.surveyType} | শিট নং: $_selectedSheetIndex'),
                   ],
                 ),
               ),
@@ -928,7 +928,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
 
     await Printing.layoutPdf(
       onLayout: (format) async => pdf.save(),
-      name: '${widget.item.mouzaName}_JL${widget.item.jlNo}_Sheet${_selectedSheetIndex}.pdf',
+      name: '${widget.item.mouzaName}_JL${widget.item.jlNo}_Sheet$_selectedSheetIndex.pdf',
     );
   }
 

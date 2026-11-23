@@ -26,7 +26,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   final FocusNode _searchFocusNode = FocusNode();
 
   Set<String> _pinnedToolIds = {};
-  bool _isLoadingPins = true;
 
   @override
   void initState() {
@@ -46,7 +45,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     if (mounted) {
       setState(() {
         _pinnedToolIds = pinned;
-        _isLoadingPins = false;
       });
     }
   }

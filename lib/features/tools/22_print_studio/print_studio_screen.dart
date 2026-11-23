@@ -3,8 +3,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/bangla_numerals.dart';
-import '../../../core/utils/bangla_formatter.dart';
 
 class PrintStudioScreen extends StatefulWidget {
   const PrintStudioScreen({super.key});

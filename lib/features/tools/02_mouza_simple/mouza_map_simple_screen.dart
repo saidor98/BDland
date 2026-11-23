@@ -7,8 +7,6 @@ import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
-import '../../../core/services/history_service.dart';
-import '../../history/models/calculation_history_item.dart';
 import '../06_all_mouza_maps/all_mouza_maps_screen.dart';
 import '../widgets/digital_gunia_scale.dart';
 import '../widgets/touch_magnifier_loupe.dart';
@@ -190,7 +188,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     final bottomWidth = (p2 - p3).distance * _feetPerPixel;
     final avgWidth = (topWidth + bottomWidth) / 2.0;
 
-    final offsetDistanceFt = targetSqFt / (topWidth > 0 ? topWidth : 200.0);
+    final offsetDistanceFt = targetSqFt / (avgWidth > 0 ? avgWidth : 200.0);
     final ratio = (offsetDistanceFt / 150.0).clamp(0.05, 0.90);
 
     setState(() {

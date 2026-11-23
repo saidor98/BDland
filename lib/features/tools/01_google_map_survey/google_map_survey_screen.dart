@@ -26,7 +26,6 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   int? _draggedIndex;
   bool _isSatelliteMode = true;
   bool _isGpsWalkMode = false;
-  double _scale = 1.0; // scale factor (feet per pixel)
   String _activeTool = 'আঁকুন';
   bool _showDimensions = true;
 

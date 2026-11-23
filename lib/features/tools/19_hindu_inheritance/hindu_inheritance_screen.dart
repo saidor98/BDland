@@ -58,7 +58,6 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
     // Dayabhaga Hindu Law rules (বাংলাদেশের হিন্দু দায়ভাগ আইন)
     if (_sonsCount > 0) {
       // 1. Sons inherit exclusively in equal shares
-      final sonShare = 1.0 / _sonsCount;
       list.add(HinduHeirResult(
         title: 'পুত্র / ছেলে',
         count: _sonsCount,
