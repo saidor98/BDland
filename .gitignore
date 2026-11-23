@@ -41,3 +41,8 @@ migrate_working_dir/
 
 # Exceptions to above rules.
 !**/ios/Flutter/Generated.xcconfig
+
+# Local Secrets & MCP
+.mcp.json
+*.jks
+key.properties
