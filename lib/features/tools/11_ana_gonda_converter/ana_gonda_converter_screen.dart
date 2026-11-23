@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../khatian/models/ana_gonda_share.dart';
+import '../widgets/ana_gonda_keypad.dart';
 
 class AnaGondaConverterScreen extends StatefulWidget {
   const AnaGondaConverterScreen({super.key});
@@ -93,6 +94,16 @@ class _AnaGondaConverterScreenState extends State<AnaGondaConverterScreen> {
             ),
             const SizedBox(height: 14),
 
+            // On-screen Virtual Keypad
+            AnaGondaKeypad(
+              onAnaSelected: (val) => setState(() => _anaCtrl.text = val.toString()),
+              onGondaSelected: (val) => setState(() => _gondaCtrl.text = val.toString()),
+              onKoraSelected: (val) => setState(() => _koraCtrl.text = val.toString()),
+              onKrantiSelected: (val) => setState(() => _krantiCtrl.text = val.toString()),
+              onTilSelected: (val) => setState(() => _tilCtrl.text = val.toString()),
+            ),
+            const SizedBox(height: 14),
+
             // Share Inputs
             Card(
               child: Padding(
@@ -129,6 +140,16 @@ class _AnaGondaConverterScreenState extends State<AnaGondaConverterScreen> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 14),
+
+            // On-screen Virtual Keypad
+            AnaGondaKeypad(
+              onAnaSelected: (val) => setState(() => _anaCtrl.text = val.toString()),
+              onGondaSelected: (val) => setState(() => _gondaCtrl.text = val.toString()),
+              onKoraSelected: (val) => setState(() => _koraCtrl.text = val.toString()),
+              onKrantiSelected: (val) => setState(() => _krantiCtrl.text = val.toString()),
+              onTilSelected: (val) => setState(() => _tilCtrl.text = val.toString()),
             ),
             const SizedBox(height: 14),
 

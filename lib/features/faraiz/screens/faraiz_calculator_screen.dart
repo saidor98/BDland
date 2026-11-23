@@ -21,6 +21,10 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
 
   final _estateDecimalController = TextEditingController(text: '100');
   final _estateTakaController = TextEditingController(text: '1000000');
+  final _funeralController = TextEditingController(text: '0');
+  final _debtController = TextEditingController(text: '0');
+  final _bequestController = TextEditingController(text: '0');
+  bool _showDeductions = false;
 
   // Heir Counts
   final Map<HeirType, int> _heirCounts = {
@@ -55,6 +59,9 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
   void dispose() {
     _estateDecimalController.dispose();
     _estateTakaController.dispose();
+    _funeralController.dispose();
+    _debtController.dispose();
+    _bequestController.dispose();
     super.dispose();
   }
 
@@ -62,12 +69,22 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
     final landDec = double.tryParse(_estateDecimalController.text) ?? 0.0;
     final cashTaka = double.tryParse(_estateTakaController.text) ?? 0.0;
 
+    final funeral = double.tryParse(_funeralController.text) ?? 0.0;
+    final debt = double.tryParse(_debtController.text) ?? 0.0;
+    final bequestRequested = double.tryParse(_bequestController.text) ?? 0.0;
+
+    // Islamic Legal deductions: Net Estate = Gross - Funeral - Debt - Bequest (max 1/3)
+    final remainderAfterDebts = (cashTaka - funeral - debt).clamp(0.0, double.infinity);
+    final maxBequestAllowed = remainderAfterDebts / 3.0;
+    final actualBequest = bequestRequested.clamp(0.0, maxBequestAllowed);
+    final netCashDistributable = (remainderAfterDebts - actualBequest).clamp(0.0, double.infinity);
+
     setState(() {
       _result = FaraizEngine.calculate(
         deceasedGender: _deceasedGender,
         heirCounts: _heirCounts,
         totalEstateDecimal: landDec,
-        totalEstateTaka: cashTaka,
+        totalEstateTaka: netCashDistributable,
         applyMflo1961: _applyMflo1961,
       );
     });
@@ -274,6 +291,68 @@ class _FaraizCalculatorScreenState extends State<FaraizCalculatorScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // Islamic Shar'i Deductions Section
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        initiallyExpanded: _showDeductions,
+                        onExpansionChanged: (val) => setState(() => _showDeductions = val),
+                        tilePadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.accentPurple),
+                        title: const Text(
+                          'ইসলামী শরীয়াহ অনুসারে প্রাথমিক দায় কর্তন',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.accentPurple),
+                        ),
+                        subtitle: const Text('কাফন-দাফন খরচ, ঋণ ও অসিয়ত (অনধিক ১/৩ অংশ)', style: TextStyle(fontSize: 11)),
+                        children: [
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _funeralController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(labelText: 'কাফন-দাফন (টাকা)', isDense: true),
+                                  onChanged: (_) => _calculate(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _debtController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(labelText: 'মৃতের ঋণ (টাকা)', isDense: true),
+                                  onChanged: (_) => _calculate(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _bequestController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(labelText: 'বৈধ ওসিয়ত (টাকা)', isDense: true),
+                                  onChanged: (_) => _calculate(),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3E8FF),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'আইনসূত্র: মোট সম্পত্তি হতে প্রথমে কাফন-দাফন খরচ, অতঃপর ঋণ পরিশোধ এবং এরপর অনধিক ১/৩ অংশ ওসিয়ত কার্যকর করার পর অবশিষ্ট নিট সম্পত্তি ওয়ারিশদের মাঝে বণ্টিত হয়।',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF581C87)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('মুসলিম পারিবারিক আইন ১৯৬১ (ধারা ৪)'),

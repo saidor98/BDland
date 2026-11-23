@@ -38,6 +38,66 @@ jobs:
           # Remove auto-generated counter test template from flutter create
           rm -f test/widget_test.dart
 
+      - name: Configure Production Release Signing & Android Permissions
+        run: |
+          # 1. Generate 2048-bit RSA Release Keystore
+          keytool -genkeypair -v -keystore android/app/bdland_release.jks \
+            -alias bdlandpro \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass bdlandrelease2026 -keypass bdlandrelease2026 \
+            -dname "CN=BDLandPro, OU=Engineering, O=BDLand, L=Dhaka, ST=Dhaka, C=BD"
+
+          # 2. Patch AndroidManifest and Gradle for verified release signing
+          python3 - << 'EOF'
+          import os, re
+
+          # Patch AndroidManifest.xml
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          if os.path.exists(manifest_path):
+              with open(manifest_path, 'r', encoding='utf-8') as f:
+                  m_content = f.read()
+              permissions = """    <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+          """
+              if "<uses-permission" not in m_content:
+                  m_content = m_content.replace("<application", permissions + "    <application", 1)
+              m_content = re.sub(r'android:label="[^"]*"', 'android:label="বিডি ল্যান্ড প্রো (BDLandPro)"', m_content)
+              with open(manifest_path, 'w', encoding='utf-8') as f:
+                  f.write(m_content)
+
+          # Patch build.gradle (Groovy)
+          gradle_file = "android/app/build.gradle"
+          if os.path.exists(gradle_file):
+              with open(gradle_file, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              if "signingConfigs {" in content:
+                  content = re.sub(
+                      r'signingConfigs\s*\{',
+                      'signingConfigs {\n        release {\n            storeFile file("bdland_release.jks")\n            storePassword "bdlandrelease2026"\n            keyAlias "bdlandpro"\n            keyPassword "bdlandrelease2026"\n            v1SigningEnabled true\n            v2SigningEnabled true\n        }',
+                      content
+                  )
+              content = content.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.release")
+              content = content.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+              with open(gradle_file, 'w', encoding='utf-8') as f:
+                  f.write(content)
+
+          # Patch build.gradle.kts (Kotlin DSL)
+          kts_file = "android/app/build.gradle.kts"
+          if os.path.exists(kts_file):
+              with open(kts_file, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              if "signingConfigs {" in content:
+                  content = re.sub(
+                      r'signingConfigs\s*\{',
+                      'signingConfigs {\n        create("release") {\n            storeFile = file("bdland_release.jks")\n            storePassword = "bdlandrelease2026"\n            keyAlias = "bdlandpro"\n            keyPassword = "bdlandrelease2026"\n            enableV1Signing = true\n            enableV2Signing = true\n        }',
+                      content
+                  )
+              content = content.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
+              with open(kts_file, 'w', encoding='utf-8') as f:
+                  f.write(content)
+          EOF
+
       - name: Install Dependencies
         run: flutter pub get
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/bangla_formatter.dart';
 
@@ -65,6 +68,50 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
         content: Text('দলিলের আনুষ্ঠানিক তফসিল ক্লিপবোর্ডে কপি করা হয়েছে!'),
         backgroundColor: AppColors.primaryGreen,
       ),
+    );
+  }
+
+  void _printTofsilPdf() async {
+    final pdf = pw.Document();
+    final text = _generateFormalTofsilText();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'সম্পত্তির তফসিল বিবরণী (Deed Schedule)',
+                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+                pw.Divider(thickness: 1.5),
+                pw.SizedBox(height: 12),
+                pw.Text(text, style: const pw.TextStyle(fontSize: 11, lineSpacing: 2)),
+                pw.Spacer(),
+                pw.Divider(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('দখলকার / দলিলগ্রহীতার স্বাক্ষর: _______________'),
+                    pw.Text('সার্ভেয়ার / আমিনের স্বাক্ষর: _______________'),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: 'Tofsil_${_mouzaCtrl.text}_Dag_${_dagCtrl.text}.pdf',
     );
   }
 
@@ -169,11 +216,25 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
             ),
             const SizedBox(height: 16),
 
-            ElevatedButton.icon(
-              onPressed: _copyTofsil,
-              icon: const Icon(Icons.copy),
-              label: const Text('আইনি দলিল তফসিল কপি করুন'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _copyTofsil,
+                    icon: const Icon(Icons.copy),
+                    label: const Text('তফসিল কপি'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _printTofsilPdf,
+                    icon: const Icon(Icons.print),
+                    label: const Text('তফসিল A4 PDF প্রিন্ট'),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, foregroundColor: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

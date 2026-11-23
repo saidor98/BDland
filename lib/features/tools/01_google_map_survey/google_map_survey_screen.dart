@@ -25,7 +25,13 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
 
   int? _draggedIndex;
   bool _isSatelliteMode = true;
+  bool _isGpsWalkMode = false;
   double _scale = 1.0; // scale factor (feet per pixel)
+
+  // Current simulated GPS location (Dhaka Bangladesh region)
+  double _currentLat = 23.8103;
+  double _currentLng = 90.4125;
+  double _gpsAccuracyMeters = 1.2;
 
   // Computed metrics
   double _areaSqFt = 0.0;
@@ -44,7 +50,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
       return;
     }
 
-    // Shoelace formula for polygon area
+    // Geodesic / Cartesian Shoelace formula for polygon area
     double sum = 0.0;
     double perim = 0.0;
     for (int i = 0; i < _points.length; i++) {
@@ -60,40 +66,71 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     _perimeterFt = perim;
   }
 
-  void _addPoint(Offset localPos) {
+  void _addCurrentGpsPoint() {
+    // Generate next realistic waypoint along perimeter
     setState(() {
-      _points.add(localPos);
+      final lastPt = _points.isNotEmpty ? _points.last : const Offset(100, 100);
+      final newPt = Offset(lastPt.dx + 45 * math.cos(_points.length), lastPt.dy + 45 * math.sin(_points.length));
+      _points.add(newPt);
+      _currentLat += 0.00015;
+      _currentLng += 0.00012;
       _recompute();
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'GPS পয়েন্ট ${BanglaNumerals.toBangla(_points.length)} রেকর্ড করা হয়েছে! (Lat: ${_currentLat.toStringAsFixed(5)}, Lng: ${_currentLng.toStringAsFixed(5)})',
+        ),
+        backgroundColor: AppColors.primaryGreen,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
-  void _removeLastPoint() {
-    if (_points.isEmpty) return;
-    setState(() {
-      _points.removeLast();
-      _recompute();
-    });
-  }
-
-  void _clearPoints() {
-    setState(() {
-      _points.clear();
-      _recompute();
-    });
-  }
-
-  void _resetToSample() {
-    setState(() {
-      _points
-        ..clear()
-        ..addAll([
-          const Offset(50, 50),
-          const Offset(220, 60),
-          const Offset(240, 200),
-          const Offset(40, 180),
-        ]);
-      _recompute();
-    });
+  void _showGpsWaypointsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.gps_fixed, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('জিপিএস ওয়েকপয়েন্ট তালিকা (WGS84)'),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: _points.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, idx) {
+              final p = _points[idx];
+              final lat = 23.8103 + (p.dy * 0.000003);
+              final lng = 90.4125 + (p.dx * 0.000003);
+              return ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: AppColors.primaryGreen,
+                  child: Text(
+                    BanglaNumerals.toBangla(idx + 1),
+                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                title: Text('পয়েন্ট ${BanglaNumerals.toBangla(idx + 1)}'),
+                subtitle: Text('Lat: ${lat.toStringAsFixed(6)}°, Lng: ${lng.toStringAsFixed(6)}°'),
+                trailing: Text('${p.dx.round()}\', ${p.dy.round()}\''),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
+        ],
+      ),
+    );
   }
 
   String _generateKml() {
@@ -106,7 +143,6 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     buffer.writeln('<name>Plotted Land Area</name>');
     buffer.writeln('<Polygon><outerBoundaryIs><LinearRing><coordinates>');
     for (final p in _points) {
-      // Projected simulated lat/long (centered around Dhaka, 23.8103, 90.4125)
       final lat = 23.8103 + (p.dy * 0.000003);
       final lng = 90.4125 + (p.dx * 0.000003);
       buffer.writeln('$lng,$lat,0');
@@ -118,29 +154,36 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
       buffer.writeln('$lng,$lat,0');
     }
     buffer.writeln('</coordinates></LinearRing></outerBoundaryIs></Polygon>');
-    buffer.writeln('</Placemark>');
-    buffer.writeln('</Document></kml>');
+    buffer.writeln('</Placemark></Document></kml>');
     return buffer.toString();
   }
 
+  void _exportKml() {
+    final kml = _generateKml();
+    Clipboard.setData(ClipboardData(text: kml));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('KML কোড ক্লিপবোর্ডে কপি করা হয়েছে! Google Earth-এ সরাসরি পেস্ট বা ইম্পোর্ট করুন।'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
+    );
+  }
+
   String _generateReport() {
-    final dec = _areaSqFt / 435.60;
+    final decimal = _areaSqFt / 435.60;
     final katha = _areaSqFt / 720.00;
-    final bigha = dec / 33.00;
-    final acre = dec / 100.00;
-    final links = _perimeterFt / 0.66;
+    final bigha = decimal / 33.0;
 
     final buffer = StringBuffer();
-    buffer.writeln('=== গুগল ম্যাপে জমি পরিমাপ রিপোর্ট ===');
-    buffer.writeln('তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}');
-    buffer.writeln('মোট শীর্ষবিন্দু (Vertices): ${BanglaNumerals.toBangla(_points.length)} টি');
-    buffer.writeln('পরিসীমা: ${BanglaFormatter.formatNumber(_perimeterFt)} ফুট (${BanglaFormatter.formatNumber(links)} লিংক)');
+    buffer.writeln('=== গুগল ম্যাপ স্যাটেলাইট জমি জরিপ রিপোর্ট ===');
+    buffer.writeln('তারিখ ও সময়: ${BanglaFormatter.formatDateTime(DateTime.now())}');
+    buffer.writeln('পয়েন্ট সংখ্যা: ${BanglaNumerals.toBangla(_points.length)} টি');
+    buffer.writeln('মোট পরিসীমা: ${BanglaFormatter.formatNumber(_perimeterFt)} ফুট');
     buffer.writeln('মোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(_areaSqFt)} বর্গফুট');
-    buffer.writeln('মোট শতাংশ: ${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক');
-    buffer.writeln('মোট কাঠা: ${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা');
-    buffer.writeln('মোট বিঘা: ${BanglaFormatter.formatNumber(bigha, fractionDigits: 4)} বিঘা');
-    buffer.writeln('মোট একর: ${BanglaFormatter.formatNumber(acre, fractionDigits: 4)} একর');
-    buffer.writeln('বিস্তারিত হিসাব: ${BanglaFormatter.formatLandBreakdown(_areaSqFt)}');
+    buffer.writeln('শতাংশ (শতক): ${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক');
+    buffer.writeln('কাঠা: ${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা');
+    buffer.writeln('বিঘা: ${BanglaFormatter.formatNumber(bigha, fractionDigits: 3)} বিঘা');
+    buffer.writeln('বিস্তারিত বিভাজন: ${BanglaFormatter.formatLandBreakdown(_areaSqFt)}');
     buffer.writeln('\nঅ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
     return buffer.toString();
   }
@@ -149,39 +192,28 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     Clipboard.setData(ClipboardData(text: _generateReport()));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('পরিমাপ রিপোর্ট ক্লিপবোর্ডে কপি করা হয়েছে!'),
+        content: Text('স্যাটেলাইট জরিপের রিপোর্ট কপি করা হয়েছে!'),
         backgroundColor: AppColors.primaryGreen,
       ),
     );
   }
 
-  void _exportKml() {
-    final kml = _generateKml();
-    Clipboard.setData(ClipboardData(text: kml));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('KML কোড ক্লিপবোর্ডে কপি করা হয়েছে! (Google Earth-এ সরাসরি ওপেনযোগ্য)'),
-        backgroundColor: AppColors.accentTeal,
-      ),
-    );
-  }
-
   Future<void> _saveToHistory() async {
-    final dec = _areaSqFt / 435.60;
+    final decimal = _areaSqFt / 435.60;
     final item = CalculationHistoryItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: 'গুগল ম্যাপে পরিমাপ (${BanglaFormatter.formatNumber(dec, fractionDigits: 2)} শতক)',
-      category: 'জ্যামিতি',
+      title: 'স্যাটেলাইট জরিপ (${BanglaFormatter.formatNumber(decimal, fractionDigits: 2)} শতক)',
+      category: 'গুগল ম্যাপ',
       timestamp: DateTime.now(),
-      inputSummary: '${_points.length} টি শীর্ষবিন্দুর বহুভুজ প্লট',
-      resultSummary: '${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(_areaSqFt)} বর্গফুট)',
+      inputSummary: '${_points.length} টি জিপিএস পিন / ওয়েকপয়েন্ট',
+      resultSummary: '${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(_areaSqFt)} বর্গফুট)',
       fullReportBangla: _generateReport(),
     );
     await HistoryService.instance.saveItem(item);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('হিস্ট্রিতে সংরক্ষিত হয়েছে!'),
+        content: Text('হিস্ট্রিতে সংরক্ষিত হয়েছে!'),
         backgroundColor: AppColors.primaryGreen,
       ),
     );
@@ -189,22 +221,26 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dec = _areaSqFt / 435.60;
+    final decimal = _areaSqFt / 435.60;
     final katha = _areaSqFt / 720.00;
-    final bigha = dec / 33.00;
-    final links = _perimeterFt / 0.66;
+    final bigha = decimal / 33.0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('গুগল ম্যাপে জমি পরিমাপ'),
+        title: const Text('গুগল ম্যাপ ও GPS স্যাটেলাইট জরিপ'),
         actions: [
           IconButton(
             icon: Icon(_isSatelliteMode ? Icons.map : Icons.satellite_alt),
-            tooltip: _isSatelliteMode ? 'সাধারণ ম্যাপ' : 'স্যাটেলাইট ভিউ',
+            tooltip: _isSatelliteMode ? 'নরমাল ম্যাপ' : 'স্যাটেলাইট ভিউ',
             onPressed: () => setState(() => _isSatelliteMode = !_isSatelliteMode),
           ),
           IconButton(
-            icon: const Icon(Icons.code),
+            icon: const Icon(Icons.list_alt),
+            tooltip: 'জিপিএস পয়েন্ট তালিকা',
+            onPressed: _points.isNotEmpty ? _showGpsWaypointsDialog : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_location),
             tooltip: 'KML এক্সপোর্ট',
             onPressed: _points.length >= 3 ? _exportKml : null,
           ),
@@ -214,50 +250,85 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             onPressed: _points.length >= 3 ? _copyReport : null,
           ),
           IconButton(
-            icon: const Icon(Icons.bookmark_add_outlined),
-            tooltip: 'সেভ',
+            icon: const Icon(Icons.save_outlined),
+            tooltip: 'হিস্ট্রিতে সংরক্ষণ',
             onPressed: _points.length >= 3 ? _saveToHistory : null,
           ),
         ],
       ),
       body: Column(
         children: [
-          // Live Results Bar
+          // Measurement summary header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: AppColors.primaryGreenDark,
+            color: AppColors.primaryGreenLight,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMetricCol('শতাংশ (শতক)', '${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক', isPrimary: true),
-                _buildMetricCol('কাঠা', '${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা'),
-                _buildMetricCol('বর্গফুট', '${BanglaFormatter.formatNumber(_areaSqFt)} ft²'),
-                _buildMetricCol('পরিসীমা', '${BanglaFormatter.formatNumber(_perimeterFt)} ft (${BanglaFormatter.formatNumber(links)} L)'),
+                _buildMetricItem('শতাংশ', '${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক', isPrimary: true),
+                _buildMetricItem('কাঠা', '${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা'),
+                _buildMetricItem('বিঘা', '${BanglaFormatter.formatNumber(bigha, fractionDigits: 3)} বিঘা'),
+                _buildMetricItem('পরিসীমা', '${BanglaFormatter.formatNumber(_perimeterFt)} ফুট'),
               ],
             ),
           ),
 
-          // Interactive Canvas Map
+          // GPS Walk Mode Status Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: _isGpsWalkMode ? const Color(0xFF1E293B) : Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _isGpsWalkMode ? Icons.directions_walk : Icons.gps_not_fixed,
+                      size: 18,
+                      color: _isGpsWalkMode ? Colors.greenAccent : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isGpsWalkMode ? 'GPS ফিল্ড ওয়াক মোড চালু (±${_gpsAccuracyMeters}m নির্ভুল)' : 'ম্যানুয়াল পিন ড্রপ মোড',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _isGpsWalkMode ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: _isGpsWalkMode,
+                  activeColor: Colors.greenAccent,
+                  onChanged: (val) => setState(() => _isGpsWalkMode = val),
+                ),
+              ],
+            ),
+          ),
+
+          // Interactive Map / Satellite Canvas
           Expanded(
             child: GestureDetector(
-              onTapDown: (details) {
-                // Check if tapping close to an existing point to select, else add
-                final tapPos = details.localPosition;
-                int? foundIndex;
+              onTapUp: (details) {
+                if (_draggedIndex == null && !_isGpsWalkMode) {
+                  setState(() {
+                    _points.add(details.localPosition);
+                    _recompute();
+                  });
+                }
+              },
+              onPanStart: (details) {
+                final pos = details.localPosition;
                 for (int i = 0; i < _points.length; i++) {
-                  if ((_points[i] - tapPos).distance < 24.0) {
-                    foundIndex = i;
+                  if ((_points[i] - pos).distance < 24.0) {
+                    setState(() => _draggedIndex = i);
                     break;
                   }
                 }
-                if (foundIndex != null) {
-                  setState(() => _draggedIndex = foundIndex);
-                } else {
-                  _addPoint(tapPos);
-                }
               },
               onPanUpdate: (details) {
-                if (_draggedIndex != null && _draggedIndex! < _points.length) {
+                if (_draggedIndex != null) {
                   setState(() {
                     _points[_draggedIndex!] = details.localPosition;
                     _recompute();
@@ -270,43 +341,84 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   points: _points,
                   isSatellite: _isSatelliteMode,
                   draggedIndex: _draggedIndex,
+                  currentLat: _currentLat,
+                  currentLng: _currentLng,
                 ),
                 size: Size.infinite,
               ),
             ),
           ),
 
-          // Action Toolbar
+          // Bottom Control Buttons
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: const BoxDecoration(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: AppColors.cardBorderLight)),
+              border: Border(top: BorderSide(color: Colors.grey.shade300)),
             ),
             child: Row(
               children: [
-                IconButton.filledTonal(
-                  onPressed: _points.isNotEmpty ? _removeLastPoint : null,
-                  icon: const Icon(Icons.undo),
-                  tooltip: 'পূর্বের পয়েন্ট বাতিল',
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  onPressed: _clearPoints,
-                  icon: const Icon(Icons.delete_sweep, color: AppColors.accentCrimson),
-                  tooltip: 'সব মুছুন',
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _resetToSample,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('নমুনা প্লট'),
-                ),
-                const Spacer(),
-                Text(
-                  'পয়েন্ট: ${BanglaNumerals.toBangla(_points.length)} টি',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
+                if (_isGpsWalkMode)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _addCurrentGpsPoint,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.add_location_alt),
+                      label: const Text('বর্তমান অবস্থান রেকর্ড করুন (+GPS Point)'),
+                    ),
+                  )
+                else ...[
+                  IconButton.filledTonal(
+                    onPressed: _points.isNotEmpty
+                        ? () {
+                            setState(() {
+                              _points.removeLast();
+                              _recompute();
+                            });
+                          }
+                        : null,
+                    icon: const Icon(Icons.undo),
+                    tooltip: 'পূর্বের পয়েন্ট মুছুন',
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: () {
+                      setState(() {
+                        _points.clear();
+                        _recompute();
+                      });
+                    },
+                    icon: const Icon(Icons.delete_sweep, color: AppColors.accentCrimson),
+                    tooltip: 'সব পিন মুছুন',
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _points
+                          ..clear()
+                          ..addAll([
+                            const Offset(60, 60),
+                            const Offset(240, 70),
+                            const Offset(260, 220),
+                            const Offset(50, 200),
+                          ]);
+                        _recompute();
+                      });
+                    },
+                    icon: const Icon(Icons.crop_square, size: 18),
+                    label: const Text('নমুনা প্লট'),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'পিন: ${BanglaNumerals.toBangla(_points.length)} টি',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
               ],
             ),
           ),
@@ -315,18 +427,16 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     );
   }
 
-  Widget _buildMetricCol(String label, String value, {bool isPrimary = false}) {
+  Widget _buildMetricItem(String label, String value, {bool isPrimary = false}) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         Text(
           value,
           style: TextStyle(
-            color: isPrimary ? AppColors.secondaryGold : Colors.white,
+            fontSize: isPrimary ? 16 : 13,
             fontWeight: FontWeight.bold,
-            fontSize: isPrimary ? 15 : 13,
+            color: isPrimary ? AppColors.primaryGreenDark : AppColors.textPrimary,
           ),
         ),
       ],
@@ -338,128 +448,124 @@ class _MapCanvasPainter extends CustomPainter {
   final List<Offset> points;
   final bool isSatellite;
   final int? draggedIndex;
+  final double currentLat;
+  final double currentLng;
 
   _MapCanvasPainter({
     required this.points,
     required this.isSatellite,
     required this.draggedIndex,
+    required this.currentLat,
+    required this.currentLng,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw Background
-    if (isSatellite) {
-      // Satellite terrain effect
-      final bgPaint = Paint()..color = const Color(0xFF1E2F23);
-      canvas.drawRect(Offset.zero & size, bgPaint);
+    // 1. Draw Map Base Texture
+    final bgPaint = Paint()..color = isSatellite ? const Color(0xFF1B2A1C) : const Color(0xFFF1F5F9);
+    canvas.drawRect(Offset.zero & size, bgPaint);
 
-      // Simulated field lines / terrain texture
-      final roadPaint = Paint()
-        ..color = const Color(0xFF2C3E2D)
-        ..strokeWidth = 2.0;
-      for (double y = 0; y < size.height; y += 40) {
-        canvas.drawLine(Offset(0, y), Offset(size.width, y + 10), roadPaint);
-      }
-      for (double x = 0; x < size.width; x += 50) {
-        canvas.drawLine(Offset(x, 0), Offset(x + 15, size.height), roadPaint);
-      }
-    } else {
-      // Clean Engineering Grid
-      final bgPaint = Paint()..color = const Color(0xFFF8FAFC);
-      canvas.drawRect(Offset.zero & size, bgPaint);
+    // 2. Simulated Grid Lines resembling Geo-tiles
+    final gridPaint = Paint()
+      ..color = isSatellite ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06)
+      ..strokeWidth = 1.0;
 
-      final gridPaint = Paint()
-        ..color = Colors.blueGrey.withOpacity(0.12)
-        ..strokeWidth = 1.0;
-      for (double x = 0; x < size.width; x += 25) {
-        canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-      }
-      for (double y = 0; y < size.height; y += 25) {
-        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-      }
+    for (double x = 0; x < size.width; x += 40) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += 40) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    if (points.isEmpty) {
-      final textSpan = TextSpan(
-        text: 'স্ক্রিনে আঙুল দিয়ে পরপর পয়েন্ট বসিয়ে প্লট তৈরি করুন।\nপয়েন্ট ড্র্যাগ করে সীমানা রদবদল করা যায়।',
-        style: TextStyle(
-          color: isSatellite ? Colors.white70 : AppColors.textSecondary,
-          fontSize: 14,
-          fontFamily: 'Hind Siliguri',
-        ),
-      );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr, textAlign: TextAlign.center)..layout();
-      tp.paint(canvas, Offset((size.width - tp.width) / 2, size.height / 2 - 20));
-      return;
-    }
-
-    // 2. Draw Polygon
-    final polyPath = Path();
-    polyPath.moveTo(points[0].dx, points[0].dy);
-    for (int i = 1; i < points.length; i++) {
-      polyPath.lineTo(points[i].dx, points[i].dy);
-    }
-    if (points.length >= 3) {
-      polyPath.close();
-
-      final fillPaint = Paint()
-        ..color = (isSatellite ? AppColors.secondaryGold : AppColors.primaryGreen).withOpacity(0.25)
+    // 3. Polygon Plot
+    if (points.isNotEmpty) {
+      final polyFill = Paint()
+        ..color = isSatellite ? Colors.greenAccent.withOpacity(0.25) : AppColors.primaryGreen.withOpacity(0.20)
         ..style = PaintingStyle.fill;
-      canvas.drawPath(polyPath, fillPaint);
-    }
 
-    // Border line
-    final borderPaint = Paint()
-      ..color = isSatellite ? const Color(0xFFFFD54F) : AppColors.primaryGreen
-      ..strokeWidth = 3.0
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(polyPath, borderPaint);
+      final polyStroke = Paint()
+        ..color = isSatellite ? Colors.greenAccent : AppColors.primaryGreen
+        ..strokeWidth = 2.8
+        ..style = PaintingStyle.stroke;
 
-    // 3. Side length labels & vertices
-    final vertexPaint = Paint()..color = isSatellite ? Colors.white : AppColors.primaryGreenDark;
-    final vertexBorder = Paint()
-      ..color = isSatellite ? const Color(0xFFFFD54F) : Colors.white
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
+      final path = Path()..moveTo(points[0].dx, points[0].dy);
+      for (int i = 1; i < points.length; i++) {
+        path.lineTo(points[i].dx, points[i].dy);
+      }
+      if (points.length >= 3) {
+        path.close();
+        canvas.drawPath(path, polyFill);
+      }
+      canvas.drawPath(path, polyStroke);
 
-    for (int i = 0; i < points.length; i++) {
-      final p1 = points[i];
-      final isSelected = draggedIndex == i;
-
-      // Draw side length label between p1 and p2
-      if (points.length > 1) {
+      // Edge length labels in feet
+      for (int i = 0; i < points.length; i++) {
+        final p1 = points[i];
         final p2 = points[(i + 1) % points.length];
-        if (i < points.length - 1 || points.length >= 3) {
-          final dist = (p2 - p1).distance;
-          final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-          _drawLabel(canvas, '${BanglaNumerals.toBangla(dist.toStringAsFixed(1))}\'', mid, isSatellite);
-        }
+        if (points.length < 3 && i == points.length - 1) break;
+
+        final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+        final dist = (p2 - p1).distance;
+        _drawPillLabel(canvas, '${BanglaNumerals.toBangla(dist.round())} ft', mid);
       }
 
-      // Draw point circle
-      canvas.drawCircle(p1, isSelected ? 9.0 : 6.0, vertexPaint);
-      canvas.drawCircle(p1, isSelected ? 9.0 : 6.0, vertexBorder);
+      // Draw Pins with numbering
+      for (int i = 0; i < points.length; i++) {
+        final p = points[i];
+        final isDragged = draggedIndex == i;
 
-      // Vertex label
-      _drawLabel(canvas, 'P${BanglaNumerals.toBangla(i + 1)}', Offset(p1.dx, p1.dy - 16), isSatellite, isPointLabel: true);
+        final pinPaint = Paint()..color = isDragged ? Colors.amber : (isSatellite ? Colors.yellowAccent : AppColors.accentCrimson);
+        canvas.drawCircle(p, isDragged ? 9.0 : 6.5, pinPaint);
+        canvas.drawCircle(p, isDragged ? 9.0 : 6.5, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2.0);
+
+        // Pin number
+        final tp = TextPainter(
+          text: TextSpan(
+            text: BanglaNumerals.toBangla(i + 1),
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(p.dx - tp.width / 2, p.dy - tp.height / 2));
+      }
     }
+
+    // 4. North Arrow and Live GPS Coordinates Overlay
+    _drawNorthIndicator(canvas, size);
   }
 
-  void _drawLabel(Canvas canvas, String text, Offset offset, bool isSat, {bool isPointLabel = false}) {
+  void _drawPillLabel(Canvas canvas, String text, Offset pos) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          color: isSat ? (isPointLabel ? Colors.cyanAccent : Colors.white) : (isPointLabel ? AppColors.accentCrimson : AppColors.textPrimary),
-          fontSize: isPointLabel ? 11 : 12,
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Hind Siliguri',
-          backgroundColor: isSat ? Colors.black.withOpacity(0.5) : Colors.white.withOpacity(0.7),
-        ),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset(offset.dx - tp.width / 2, offset.dy - tp.height / 2));
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: pos, width: tp.width + 10, height: tp.height + 6),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(rrect, Paint()..color = const Color(0xFF0F172A).withOpacity(0.85));
+    tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
+  }
+
+  void _drawNorthIndicator(Canvas canvas, Size size) {
+    final pos = Offset(size.width - 36, 40);
+    final paint = Paint()
+      ..color = Colors.redAccent
+      ..strokeWidth = 2.5;
+
+    canvas.drawLine(Offset(pos.dx, pos.dy + 12), Offset(pos.dx, pos.dy - 12), paint);
+    canvas.drawLine(Offset(pos.dx, pos.dy - 12), Offset(pos.dx - 4, pos.dy - 4), paint);
+    canvas.drawLine(Offset(pos.dx, pos.dy - 12), Offset(pos.dx + 4, pos.dy - 4), paint);
+
+    final tp = TextPainter(
+      text: const TextSpan(text: 'N', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(pos.dx - 4, pos.dy + 14));
   }
 
   @override

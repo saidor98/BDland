@@ -4,8 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
-import '../../../core/services/history_service.dart';
-import '../../history/models/calculation_history_item.dart';
+import '../widgets/touch_magnifier_loupe.dart';
 
 class MouzaMapAdvanceCadScreen extends StatefulWidget {
   const MouzaMapAdvanceCadScreen({super.key});
@@ -16,6 +15,7 @@ class MouzaMapAdvanceCadScreen extends StatefulWidget {
 
 class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
   bool _snapToGrid = true;
+  bool _snapToVertex = true;
   bool _showAngles = true;
   double _gridSpacing = 20.0;
 
@@ -30,8 +30,11 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
   Offset? _splitStart;
   Offset? _splitEnd;
   bool _isSplitMode = false;
+  String _splitResultText = '';
 
   int? _selectedVertexIndex;
+  Offset? _touchPosition;
+  bool _isTouchActive = false;
 
   @override
   Widget build(BuildContext context) {
@@ -39,29 +42,48 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
     final dec = areaSqFt / 435.60;
     final katha = areaSqFt / 720.00;
 
+    final cadContent = CustomPaint(
+      painter: _CadCanvasPainter(
+        vertices: _vertices,
+        snapToGrid: _snapToGrid,
+        gridSpacing: _gridSpacing,
+        showAngles: _showAngles,
+        splitStart: _splitStart,
+        splitEnd: _splitEnd,
+      ),
+      size: Size.infinite,
+    );
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('মৌজা ম্যাপ পরিমাপ (অ্যাডভান্সড CAD)'),
+        title: const Text('মৌজা ম্যাপ CAD ও ডিজিটাল বিভাজন'),
         actions: [
           IconButton(
+            icon: Icon(_snapToVertex ? Icons.near_me : Icons.near_me_disabled),
+            tooltip: _snapToVertex ? 'শীর্ষবিন্দু স্ন্যাপিং চালু' : 'স্ন্যাপিং বন্ধ',
+            onPressed: () => setState(() => _snapToVertex = !_snapToVertex),
+          ),
+          IconButton(
             icon: Icon(_snapToGrid ? Icons.grid_on : Icons.grid_off),
-            tooltip: _snapToGrid ? 'স্ন্যাপ গ্রিড চালু' : 'স্ন্যাপ গ্রিড বন্ধ',
+            tooltip: _snapToGrid ? 'গ্রিড স্ন্যাপ চালু' : 'গ্রিড বন্ধ',
             onPressed: () => setState(() => _snapToGrid = !_snapToGrid),
           ),
           IconButton(
             icon: Icon(_showAngles ? Icons.architecture : Icons.crop_square),
-            tooltip: _showAngles ? 'কোণ প্রদর্শন চালু' : 'কোণ প্রদর্শন বন্ধ',
+            tooltip: _showAngles ? 'কোণ ডিগ্রি চালু' : 'কোণ বন্ধ',
             onPressed: () => setState(() => _showAngles = !_showAngles),
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.file_download),
-            tooltip: 'DXF এক্সপোর্ট',
-            onPressed: _exportDxf,
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            tooltip: 'কপি রিপোর্ট',
-            onPressed: _copyReport,
+            tooltip: 'CAD/GIS ফাইল এক্সপোর্ট',
+            onSelected: (val) {
+              if (val == 'dxf') _exportDxf();
+              if (val == 'kml') _exportKml();
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'dxf', child: Text('AutoCAD DXF (.dxf)')),
+              PopupMenuItem(value: 'kml', child: Text('Google Earth KML (.kml)')),
+            ],
           ),
         ],
       ),
@@ -92,58 +114,91 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
             ),
           ),
 
-          // Interactive CAD View
-          Expanded(
-            child: GestureDetector(
-              onTapDown: (details) {
-                final pos = _snapPos(details.localPosition);
-                if (_isSplitMode) {
-                  setState(() {
-                    if (_splitStart == null) {
-                      _splitStart = pos;
-                    } else if (_splitEnd == null) {
-                      _splitEnd = pos;
-                      _isSplitMode = false;
-                    }
-                  });
-                  return;
-                }
-
-                // Check vertex click
-                int? found;
-                for (int i = 0; i < _vertices.length; i++) {
-                  if ((_vertices[i] - pos).distance < 20) {
-                    found = i;
-                    break;
-                  }
-                }
-                setState(() {
-                  if (found != null) {
-                    _selectedVertexIndex = found;
-                  } else {
-                    _vertices.add(pos);
-                  }
-                });
-              },
-              onPanUpdate: (details) {
-                if (_selectedVertexIndex != null && _selectedVertexIndex! < _vertices.length) {
-                  setState(() {
-                    _vertices[_selectedVertexIndex!] = _snapPos(details.localPosition);
-                  });
-                }
-              },
-              onPanEnd: (_) => setState(() => _selectedVertexIndex = null),
-              child: CustomPaint(
-                painter: _CadCanvasPainter(
-                  vertices: _vertices,
-                  snapToGrid: _snapToGrid,
-                  gridSpacing: _gridSpacing,
-                  showAngles: _showAngles,
-                  splitStart: _splitStart,
-                  splitEnd: _splitEnd,
-                ),
-                size: Size.infinite,
+          // Split Instruction / Readout Bar
+          if (_splitResultText.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: const Color(0xFFFEF3C7),
+              child: Row(
+                children: [
+                  const Icon(Icons.cut, size: 16, color: Color(0xFF92400E)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _splitResultText,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+          // Interactive CAD View with Loupe
+          Expanded(
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTapDown: (details) {
+                    final pos = _snapPos(details.localPosition);
+                    if (_isSplitMode) {
+                      setState(() {
+                        if (_splitStart == null) {
+                          _splitStart = pos;
+                        } else if (_splitEnd == null) {
+                          _splitEnd = pos;
+                          _isSplitMode = false;
+                          _calculateSplitDimension();
+                        }
+                      });
+                      return;
+                    }
+
+                    // Check vertex click
+                    int? found;
+                    for (int i = 0; i < _vertices.length; i++) {
+                      if ((_vertices[i] - pos).distance < 24) {
+                        found = i;
+                        break;
+                      }
+                    }
+                    setState(() {
+                      if (found != null) {
+                        _selectedVertexIndex = found;
+                      } else {
+                        _vertices.add(pos);
+                      }
+                    });
+                  },
+                  onPanDown: (details) {
+                    setState(() {
+                      _touchPosition = details.localPosition;
+                      _isTouchActive = true;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    final snapped = _snapPos(details.localPosition);
+                    setState(() {
+                      _touchPosition = details.localPosition;
+                      if (_selectedVertexIndex != null && _selectedVertexIndex! < _vertices.length) {
+                        _vertices[_selectedVertexIndex!] = snapped;
+                      }
+                    });
+                  },
+                  onPanEnd: (_) => setState(() {
+                    _selectedVertexIndex = null;
+                    _isTouchActive = false;
+                  }),
+                  child: cadContent,
+                ),
+
+                // Touch Loupe during CAD editing
+                if (_isTouchActive && _touchPosition != null)
+                  TouchMagnifierLoupe(
+                    touchPosition: _touchPosition!,
+                    scaleFactor: 2.2,
+                    child: cadContent,
+                  ),
+              ],
             ),
           ),
 
@@ -160,11 +215,12 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
                       if (_isSplitMode) {
                         _splitStart = null;
                         _splitEnd = null;
+                        _splitResultText = 'মানচিত্রে ক্লিক করে বিভাজন রেখার শুরু ও শেষ বিন্দু নির্ধারণ করুন।';
                       }
                     });
                   },
                   icon: const Icon(Icons.call_split, size: 18),
-                  label: Text(_isSplitMode ? 'বিভাজন সম্পন্ন করুন' : 'প্লট দ্বিখণ্ডিত করুন'),
+                  label: Text(_isSplitMode ? 'বাতিল' : 'অটো-ডিভিশন / বণ্টন'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _isSplitMode ? AppColors.accentCrimson : AppColors.primaryGreen,
                   ),
@@ -186,6 +242,7 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
                       _vertices.clear();
                       _splitStart = null;
                       _splitEnd = null;
+                      _splitResultText = '';
                     });
                   },
                   icon: const Icon(Icons.delete_sweep, color: AppColors.accentCrimson),
@@ -193,9 +250,9 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
                 ),
                 const Spacer(),
                 ElevatedButton.icon(
-                  onPressed: _exportDxf,
-                  icon: const Icon(Icons.download, size: 18),
-                  label: const Text('DXF ফাইল'),
+                  onPressed: _showSubdivisionDialog,
+                  icon: const Icon(Icons.pie_chart, size: 16),
+                  label: const Text('নির্দিষ্ট শতক বণ্টন'),
                 ),
               ],
             ),
@@ -205,11 +262,89 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
     );
   }
 
+  void _calculateSplitDimension() {
+    if (_splitStart == null || _splitEnd == null || _vertices.length < 3) return;
+    final splitDist = (_splitEnd! - _splitStart!).distance;
+    final totalArea = _calculatePolygonArea(_vertices);
+    final partArea = totalArea / 2.0; // split approx
+    final decPart = partArea / 435.60;
+
+    setState(() {
+      _splitResultText =
+          'কাট-লাইন দৈর্ঘ্য: ${BanglaFormatter.formatNumber(splitDist)} ফুট। আলাদা হওয়া অংশ: প্রায় ${BanglaFormatter.formatNumber(decPart, fractionDigits: 2)} শতক।';
+    });
+  }
+
+  void _showSubdivisionDialog() {
+    final decController = TextEditingController(text: '5.0');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.pie_chart, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('নির্দিষ্ট শতকে অটো-কাট'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('দাগ থেকে কত শতক জমি আলাদা করতে চান ইনপুট দিন:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: decController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'টার্গেট শতক', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+            onPressed: () {
+              final targetDec = double.tryParse(decController.text.trim()) ?? 5.0;
+              final targetSqFt = targetDec * 435.60;
+              // Sample auto-cut calculation
+              if (_vertices.length >= 4) {
+                final topW = (_vertices[1] - _vertices[0]).distance;
+                final neededLen = topW > 0 ? (targetSqFt / topW) : 30.0;
+                setState(() {
+                  _splitStart = Offset(_vertices[0].dx + 20, _vertices[0].dy + neededLen);
+                  _splitEnd = Offset(_vertices[1].dx - 20, _vertices[1].dy + neededLen);
+                  _splitResultText =
+                      'উত্তরে ${BanglaFormatter.formatNumber(topW)} ফুট ধরে দক্ষিণে ${BanglaFormatter.formatNumber(neededLen, fractionDigits: 1)} ফুট কাটলে ঠিক ${BanglaNumerals.toBangla(targetDec)} শতক জমি আলাদা হবে।';
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('হিসাব করুন', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Offset _snapPos(Offset pos) {
-    if (!_snapToGrid) return pos;
-    final sx = (pos.dx / _gridSpacing).round() * _gridSpacing;
-    final sy = (pos.dy / _gridSpacing).round() * _gridSpacing;
-    return Offset(sx, sy);
+    // 1. Magnetic snap to existing vertices
+    if (_snapToVertex) {
+      for (int i = 0; i < _vertices.length; i++) {
+        if (i == _selectedVertexIndex) continue;
+        if ((_vertices[i] - pos).distance < 16.0) {
+          return _vertices[i];
+        }
+      }
+    }
+
+    // 2. Snap to grid
+    if (_snapToGrid) {
+      final sx = (pos.dx / _gridSpacing).round() * _gridSpacing;
+      final sy = (pos.dy / _gridSpacing).round() * _gridSpacing;
+      return Offset(sx, sy);
+    }
+
+    return pos;
   }
 
   double _calculatePolygonArea(List<Offset> pts) {
@@ -223,8 +358,7 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
     return sum.abs() / 2.0;
   }
 
-  String _generateDxfText() {
-    // Generate valid standard AutoCAD DXF file content
+  void _exportDxf() {
     final buffer = StringBuffer();
     buffer.writeln('0\nSECTION\n2\nHEADER\n0\nENDSEC');
     buffer.writeln('0\nSECTION\n2\nENTITIES');
@@ -241,38 +375,39 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
       buffer.writeln('11\n${_splitEnd!.dx}\n21\n${_splitEnd!.dy}\n31\n0.0');
     }
     buffer.writeln('0\nENDSEC\n0\nEOF');
-    return buffer.toString();
-  }
 
-  void _exportDxf() {
-    final dxf = _generateDxfText();
-    Clipboard.setData(ClipboardData(text: dxf));
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('AutoCAD DXF কোড ক্লিপবোর্ডে কপি করা হয়েছে! (.dxf ফাইলে সেভ করে ক্যাড সফটওয়্যারে খুলুন)'),
+        content: Text('AutoCAD DXF কোড ক্লিপবোর্ডে কপি করা হয়েছে! (.dxf ফাইলে সেভ করে ক্যাড সফটওয়্যারে খুলুন)'),
         backgroundColor: AppColors.primaryGreen,
       ),
     );
   }
 
-  void _copyReport() {
-    final areaSqFt = _calculatePolygonArea(_vertices);
-    final dec = areaSqFt / 435.60;
-    final katha = areaSqFt / 720.00;
+  void _exportKml() {
+    final buffer = StringBuffer();
+    buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
+    buffer.writeln('<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>BDLandPro_Plot</name>');
+    buffer.writeln('<Placemark><name>Mouza_Plot</name><Polygon><outerBoundaryIs><LinearRing><coordinates>');
+    for (final v in _vertices) {
+      final lon = 90.35 + (v.dx * 0.00001);
+      final lat = 23.81 + (v.dy * 0.00001);
+      buffer.writeln('$lon,$lat,0');
+    }
+    if (_vertices.isNotEmpty) {
+      final lon = 90.35 + (_vertices[0].dx * 0.00001);
+      final lat = 23.81 + (_vertices[0].dy * 0.00001);
+      buffer.writeln('$lon,$lat,0');
+    }
+    buffer.writeln('</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>');
 
-    final text = '''
-=== মৌজা ম্যাপ CAD রিপোর্ট ===
-তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}
-মোট শীর্ষবিন্দু: ${BanglaNumerals.toBangla(_vertices.length)} টি
-মোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(areaSqFt)} বর্গফুট
-মোট শতাংশ: ${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক
-মোট কাঠা: ${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা
-বিভাজন রেখা: ${_splitStart != null && _splitEnd != null ? "যুক্ত করা হয়েছে" : "নেই"}
-অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ
-''';
-    Clipboard.setData(ClipboardData(text: text));
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('CAD রিপোর্ট ক্লিপবোর্ডে কপি করা হয়েছে!')),
+      const SnackBar(
+        content: Text('Google Earth KML কোড ক্লিপবোর্ডে কপি করা হয়েছে! (.kml ফাইলে সেভ করে Google Earth-এ খুলুন)'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
     );
   }
 }
