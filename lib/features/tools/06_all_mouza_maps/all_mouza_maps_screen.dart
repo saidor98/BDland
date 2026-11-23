@@ -613,7 +613,17 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const MouzaMapSimpleScreen(),
+                          builder: (_) => MouzaMapSimpleScreen(
+                            initialMouzaName: widget.item.mouzaName,
+                            initialSheetNo: 'শিট ${BanglaNumerals.toBangla(_selectedSheetIndex)}',
+                            initialJlNo: widget.item.jlNo,
+                            initialPoints: const [
+                              Offset(70, 70),
+                              Offset(240, 65),
+                              Offset(260, 210),
+                              Offset(60, 200),
+                            ],
+                          ),
                         ),
                       );
                     },
