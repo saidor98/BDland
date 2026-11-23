@@ -38,7 +38,7 @@ jobs:
           # Remove auto-generated counter test template from flutter create
           rm -f test/widget_test.dart
 
-      - name: Configure Production Release Signing & Android Permissions
+      - name: Configure Production Release Signing and Android Permissions
         run: |
           # 1. Generate 2048-bit RSA Release Keystore
           keytool -genkeypair -v -keystore android/app/bdland_release.jks \
