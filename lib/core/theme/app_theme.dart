@@ -15,7 +15,6 @@ class AppTheme {
         primary: AppColors.primaryGreen,
         secondary: AppColors.secondaryGold,
         surface: AppColors.surfaceLight,
-        background: AppColors.backgroundLight,
         error: AppColors.accentCrimson,
       ),
       scaffoldBackgroundColor: AppColors.backgroundLight,
@@ -61,7 +60,7 @@ class AppTheme {
           color: Colors.white,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surfaceLight,
         elevation: 1.5,
         shadowColor: Colors.black.withOpacity(0.08),
