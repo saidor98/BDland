@@ -48,7 +48,7 @@ jobs:
         run: flutter pub get
 
       - name: Run Unit Tests
-        run: flutter test
+        run: flutter test --reporter=expanded
 
       - name: Analyze Project Code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings

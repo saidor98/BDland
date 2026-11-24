@@ -18,7 +18,7 @@ void main() {
       final esriUrl = MapConfig.getEsriTileUrl(MapConfig.esriWorldImageryBase, 17, 98455, 56838);
       expect(esriUrl, contains('arcgisonline.com'));
       expect(esriUrl, contains('World_Imagery'));
-      expect(esriUrl, endsWith('17/98455/56838'));
+      expect(esriUrl, endsWith('17/56838/98455'));
     });
 
     test('BangladeshAdministrativeData contains 8 divisions and 64 districts', () {
