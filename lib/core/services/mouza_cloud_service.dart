@@ -28,9 +28,12 @@ class MouzaCloudItem {
     final isFolder = mime == 'application/vnd.google-apps.folder';
     final name = json['name'] as String? ?? 'অজানা ফাইল';
     final link = json['link'] as String?;
-    final downloadUrl = link != null ? 'https://free.mouzamap.tech$link' : null;
-
     final subPath = currentPath.isEmpty ? name : '$currentPath/$name';
+    final downloadUrl = isFolder
+        ? null
+        : (link != null
+            ? (link.startsWith('http') ? link : 'https://free.mouzamap.tech$link')
+            : 'https://free.mouzamap.tech/$driveIndex:/${subPath.split('/').map(Uri.encodeComponent).join('/')}');
 
     return MouzaCloudItem(
       name: name,

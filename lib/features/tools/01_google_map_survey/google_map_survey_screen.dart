@@ -109,15 +109,11 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   }
 
   void _addCurrentGpsPoint() {
+    final center = _mapController.currentCenter;
     setState(() {
-      final lastPt = _surveyPoints.isNotEmpty ? _surveyPoints.last : const LatLngPoint(23.8110, 90.4126);
-      final newPt = LatLngPoint(
-        lastPt.latitude + 0.00018 * math.cos(_surveyPoints.length),
-        lastPt.longitude + 0.00015 * math.sin(_surveyPoints.length),
-      );
-      _surveyPoints.add(newPt);
-      _currentLat = newPt.latitude;
-      _currentLng = newPt.longitude;
+      _surveyPoints.add(center);
+      _currentLat = center.latitude;
+      _currentLng = center.longitude;
       _selectedVertexIndex = _surveyPoints.length - 1;
       _recompute();
     });
@@ -125,10 +121,158 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'GPS পয়েন্ট ${BanglaNumerals.toBangla(_surveyPoints.length)} রেকর্ড করা হয়েছে! (Lat: ${_currentLat.toStringAsFixed(6)}°, Lng: ${_currentLng.toStringAsFixed(6)}°)',
+          'GPS পয়েন্ট ${BanglaNumerals.toBangla(_surveyPoints.length)} রেকর্ড করা হয়েছে! (${center.latitude.toStringAsFixed(6)}° N, ${center.longitude.toStringAsFixed(6)}° E)',
         ),
         backgroundColor: AppColors.primaryGreen,
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showAddCustomCoordinateDialog(BuildContext context, {required VoidCallback onAdded}) {
+    final latCtrl = TextEditingController(text: _mapController.currentCenter.latitude.toStringAsFixed(6));
+    final lngCtrl = TextEditingController(text: _mapController.currentCenter.longitude.toStringAsFixed(6));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.add_location_alt, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('সরাসরি GPS কোঅর্ডিনেট যোগ করুন', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'WGS84 ডেসিমাল ডিগ্রি ফরম্যাটে অক্ষাংশ (Lat) ও দ্রাঘিমাংশ (Lng) লিখুন:',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: latCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'অক্ষাংশ (Latitude - উত্তর N)',
+                hintText: 'e.g. 23.8103',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: lngCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'দ্রাঘিমাংশ (Longitude - পূর্ব E)',
+                hintText: 'e.g. 90.4125',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, foregroundColor: Colors.white),
+            onPressed: () {
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (lat == null || lng == null || lat < 20.0 || lat > 27.0 || lng < 88.0 || lng > 93.0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('সঠিক বাংলাদেশি জিপিএস কোঅর্ডিনেট দিন (Lat: 20°-27°, Lng: 88°-93°)'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final newPt = LatLngPoint(lat, lng);
+              setState(() {
+                _surveyPoints.add(newPt);
+                _selectedVertexIndex = _surveyPoints.length - 1;
+                _recompute();
+              });
+              _mapController.jumpTo(lat, lng, zoom: 18.0);
+              Navigator.pop(ctx);
+              onAdded();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('নতুন জিপিএস পয়েন্ট ${_surveyPoints.length} যুক্ত করা হয়েছে!'),
+                  backgroundColor: AppColors.primaryGreen,
+                ),
+              );
+            },
+            child: const Text('যুক্ত করুন'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCoordinateDialog(BuildContext context, int index, {required VoidCallback onEdited}) {
+    final pt = _surveyPoints[index];
+    final latCtrl = TextEditingController(text: pt.latitude.toStringAsFixed(6));
+    final lngCtrl = TextEditingController(text: pt.longitude.toStringAsFixed(6));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.edit_location_alt, color: Color(0xFFD97706)),
+            const SizedBox(width: 8),
+            Text('পয়েন্ট ${BanglaNumerals.toBangla(index + 1)} কোঅর্ডিনেট এডিট', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: latCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'অক্ষাংশ (Latitude)',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: lngCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'দ্রাঘিমাংশ (Longitude)',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, foregroundColor: Colors.white),
+            onPressed: () {
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (lat != null && lng != null) {
+                setState(() {
+                  _surveyPoints[index] = LatLngPoint(lat, lng);
+                  _recompute();
+                });
+                _mapController.jumpTo(lat, lng, zoom: 18.0);
+                Navigator.pop(ctx);
+                onEdited();
+              }
+            },
+            child: const Text('সংরক্ষণ'),
+          ),
+        ],
       ),
     );
   }
@@ -219,6 +363,15 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                               },
                             ),
                             IconButton(
+                              icon: const Icon(Icons.edit, size: 18, color: Color(0xFFD97706)),
+                              tooltip: 'কোঅর্ডিনেট এডিট',
+                              onPressed: () {
+                                _showEditCoordinateDialog(context, idx, onEdited: () {
+                                  setDialogState(() {});
+                                });
+                              },
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                               tooltip: 'পয়েন্ট মুছুন',
                               onPressed: () {
@@ -236,6 +389,15 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   ),
           ),
           actions: [
+            TextButton.icon(
+              onPressed: () {
+                _showAddCustomCoordinateDialog(context, onAdded: () {
+                  setDialogState(() {});
+                });
+              },
+              icon: const Icon(Icons.add_location_alt, size: 16),
+              label: const Text('+ নতুন কোঅর্ডিনেট লিখুন'),
+            ),
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
           ],
         ),

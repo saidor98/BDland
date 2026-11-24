@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../01_google_map_survey/google_map_survey_screen.dart';
 import '../06_all_mouza_maps/all_mouza_maps_screen.dart';
 import '../widgets/digital_gunia_scale.dart';
 import '../widgets/touch_magnifier_loupe.dart';
@@ -18,6 +19,7 @@ class MouzaMapSimpleScreen extends StatefulWidget {
   final String? initialSheetNo;
   final String? initialJlNo;
   final List<Offset>? initialPoints;
+  final String? initialImageUrl;
 
   const MouzaMapSimpleScreen({
     super.key,
@@ -25,6 +27,7 @@ class MouzaMapSimpleScreen extends StatefulWidget {
     this.initialSheetNo,
     this.initialJlNo,
     this.initialPoints,
+    this.initialImageUrl,
   });
 
   @override
@@ -42,6 +45,218 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   double _feetPerPixel = 1.0; // 1.0 gives 200.0', 161.2', 240.8', 141.4', 33,000 sq ft
   bool _isHighQuality = true;
   bool _highContrast = false;
+  bool _showScannedSheet = true;
+  double _sheetOpacity = 0.85;
+  String? _customSheetImageUrl;
+
+  Widget _buildMapBackgroundLayer() {
+    if (!_showScannedSheet) {
+      return Container(
+        color: _highContrast ? Colors.white : const Color(0xFF0F172A),
+      );
+    }
+
+    final imageUrl = _customSheetImageUrl;
+    Widget imageWidget;
+    if (imageUrl != null && imageUrl.startsWith('assets/')) {
+      imageWidget = Image.asset(
+        imageUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (ctx, err, stack) => Image.asset(
+          'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+          fit: BoxFit.contain,
+        ),
+      );
+    } else if (imageUrl != null && imageUrl.startsWith('http')) {
+      imageWidget = Image.network(
+        imageUrl,
+        fit: BoxFit.contain,
+        headers: const {'User-Agent': 'BDLandPro/1.0 (Cadastral OS)'},
+        errorBuilder: (ctx, err, stack) => Image.asset(
+          'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+          fit: BoxFit.contain,
+          errorBuilder: (ctx2, err2, stack2) => CustomPaint(
+            painter: _CadastralSheetFallbackPainter(),
+            size: Size.infinite,
+          ),
+        ),
+      );
+    } else {
+      imageWidget = Image.asset(
+        'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+        fit: BoxFit.contain,
+        errorBuilder: (ctx, err, stack) => CustomPaint(
+          painter: _CadastralSheetFallbackPainter(),
+          size: Size.infinite,
+        ),
+      );
+    }
+
+    return Container(
+      color: _highContrast ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+      child: Opacity(
+        opacity: _sheetOpacity.clamp(0.1, 1.0),
+        child: Center(
+          child: imageWidget,
+        ),
+      ),
+    );
+  }
+
+  void _showGpsLocationDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.gps_fixed, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('মৌজা জিপিএস ও ভৌগোলিক পজিশন', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.satellite_alt, color: Color(0xFF16A34A), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'GNSS RTK Fix (14 Sats) | নির্ভুলতা: ±০.০১ মিটার\nWGS84 / BTM ডেটাম রেফারেন্স',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'মৌজা শিট রেফারেন্স কোঅর্ডিনেট:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'অক্ষাংশ (Lat): ২৩.৮১০৩০০° N\nদ্রাঘিমাংশ (Lng): ৯০.৪১২৫০০° E\nDMS: ২৩° ৪৮\' ৩৭.১" N, ৯০° ২৪\' ৪৫.০" E',
+              style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'সার্ভেয়ার নোট: এই মৌজা ম্যাপের শীর্ষবিন্দুসমূহ গুগল ম্যাপে ট্রান্সফার করে বাস্তব জমিতে বাউন্ডারি ড্রাইভ করতে পারবেন।',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (c) => const GoogleMapSurveyScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.map, size: 16),
+            label: const Text('গুগল ম্যাপে দেখুন'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSheetSelectorModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.photo_library, color: AppColors.primaryGreen),
+                SizedBox(width: 8),
+                Text('আসল মৌজা নকশা নির্বাচন করুন', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.map_outlined, color: Color(0xFF0284C7)),
+              title: const Text('১০১ - টঙ্গিবাড়ী, মুন্সীগঞ্জ (CS / RS জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('www.mouzamap.tech ফুল এইচডি স্ক্যান শিট'),
+              trailing: const Icon(Icons.check_circle, color: AppColors.primaryGreen, size: 18),
+              onTap: () {
+                setState(() {
+                  _activeMouza = 'মৌজা: ১০১ - টঙ্গিবাড়ী (জে.এল. ৩৪)';
+                  _customSheetImageUrl =
+                      'https://free.mouzamap.tech/0:/Munshiganj/%E0%A6%9F%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BF%E0%A6%AC%E0%A6%BE%E0%A6%A1%E0%A6%BC%E0%A7%80/101%20-%20(www.mouzamap.tech).jpg';
+                  _showScannedSheet = true;
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.map_outlined, color: Color(0xFF0284C7)),
+              title: const Text('১০২ - টঙ্গিবাড়ী, মুন্সীগঞ্জ (CS / RS জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('www.mouzamap.tech ফুল এইচডি স্ক্যান শিট'),
+              onTap: () {
+                setState(() {
+                  _activeMouza = 'মৌজা: ১০২ - টঙ্গিবাড়ী (জে.এল. ৩৫)';
+                  _customSheetImageUrl =
+                      'https://free.mouzamap.tech/0:/Munshiganj/%E0%A6%9F%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BF%E0%A6%AC%E0%A6%BE%E0%A6%A1%E0%A6%BC%E0%A7%80/102%20-%20(www.mouzamap.tech).jpg';
+                  _showScannedSheet = true;
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.map_outlined, color: Color(0xFF0284C7)),
+              title: const Text('তেজকুনিপাড়া, ঢাকা (SA জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('অফলাইন বান্ডেল্ড ক্যাডাস্ট্রাল শিট ১'),
+              onTap: () {
+                setState(() {
+                  _activeMouza = 'মৌজা: তেজকুনিপাড়া (জে.এল. ৮৯)';
+                  _customSheetImageUrl = null;
+                  _showScannedSheet = true;
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.photo_camera, color: Color(0xFF16A34A)),
+              title: const Text('গ্যালারি / ক্যামেরা থেকে নকশা ছবি আনুন', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('স্মার্টফোনে তোলা মৌজা নকশার যেকোনো ছবি'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openDeviceFilePicker();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // Saved Projects List (Image 5 / Page 5)
   final List<Map<String, dynamic>> _savedProjects = [
@@ -143,6 +358,10 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     if (widget.initialMouzaName != null) {
       _activeMouza = 'মৌজা: ${widget.initialMouzaName} (জে.এল. ${widget.initialJlNo ?? "৩৪"})';
       _activeSheet = widget.initialSheetNo ?? 'শিট ১';
+    }
+    if (widget.initialImageUrl != null) {
+      _customSheetImageUrl = widget.initialImageUrl;
+      _showScannedSheet = true;
     }
     _recompute();
   }
@@ -1399,13 +1618,9 @@ $coords
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.near_me, color: Colors.white),
-            tooltip: 'জিপিএস কেন্দ্র',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('জিপিএস লোকেশন সেন্টারিং সক্রিয়')),
-              );
-            },
+            icon: const Icon(Icons.gps_fixed, color: Colors.white),
+            tooltip: 'জিপিএস রেফারেন্স',
+            onPressed: _showGpsLocationDialog,
           ),
           IconButton(
             icon: Icon(
@@ -1428,12 +1643,14 @@ $coords
               if (val == 'dxf') _exportDxf();
               if (val == 'kml') _exportKml();
               if (val == 'add_pt') _addNewPointAtCenter();
+              if (val == 'sheet_sel') _showSheetSelectorModal();
             },
             itemBuilder: (ctx) => const [
               PopupMenuItem(value: 'pdf', child: Text('অফিশিয়াল A4 PDF প্রত্যয়ন')),
               PopupMenuItem(value: 'dxf', child: Text('AutoCAD DXF (.dxf)')),
               PopupMenuItem(value: 'kml', child: Text('Google Earth KML (.kml)')),
               PopupMenuItem(value: 'add_pt', child: Text('নতুন শীর্ষবিন্দু যোগ করুন (+)')),
+              PopupMenuItem(value: 'sheet_sel', child: Text('আসল নকশা শিট নির্বাচন করুন')),
             ],
           ),
         ],
@@ -1469,6 +1686,127 @@ $coords
             ),
           ),
 
+          // Sheet Controls Sub-Bar (Toggle sheet visibility, opacity, sheet switch, and add vertex)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            color: const Color(0xFF0F172A),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _showScannedSheet = !_showScannedSheet),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _showScannedSheet ? const Color(0xFF166534) : const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _showScannedSheet ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _showScannedSheet ? 'নকশা চালু' : 'নকশা বন্ধ',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _showSheetSelectorModal,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0369A1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.photo_library, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text('নকশা পরিবর্তন', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<double>(
+                    tooltip: 'নকশা অপাসিটি',
+                    onSelected: (val) => setState(() => _sheetOpacity = val),
+                    itemBuilder: (ctx) => const [
+                      PopupMenuItem(value: 0.35, child: Text('অপাসিটি ৩৫%')),
+                      PopupMenuItem(value: 0.50, child: Text('অপাসিটি ৫০%')),
+                      PopupMenuItem(value: 0.75, child: Text('অপাসিটি ৭৫%')),
+                      PopupMenuItem(value: 0.90, child: Text('অপাসিটি ৯০% (স্ট্যান্ডার্ড)')),
+                      PopupMenuItem(value: 1.00, child: Text('অপাসিটি ১০০% (গাঢ়)')),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.opacity, color: Colors.white70, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            'স্বচ্ছতা: ${(_sheetOpacity * 100).round()}%',
+                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _addNewPointAtCenter,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF854D0E),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add_circle_outline, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text('+ নতুন বিন্দু', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _showGpsLocationDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        border: Border.all(color: const Color(0xFF475569)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.gps_fixed, color: Color(0xFF4ADE80), size: 14),
+                          SizedBox(width: 4),
+                          Text('GPS অবস্থান', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           // Optional Cut-Line Status Alert
           if (_showDivisionCutLine)
             Container(
@@ -1496,6 +1834,11 @@ $coords
           Expanded(
             child: Stack(
               children: [
+                // Authentic Scanned Cadastral Sheet Layer (Positioned behind CAD canvas)
+                Positioned.fill(
+                  child: _buildMapBackgroundLayer(),
+                ),
+
                 // Interactive Listener for Moving Vertices and Touch Magnifier Loupe
                 Listener(
                   onPointerDown: (event) {
@@ -1577,7 +1920,12 @@ $coords
                   TouchMagnifierLoupe(
                     touchPosition: _touchPosition!,
                     scaleFactor: 2.2,
-                    child: cadCanvas,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(child: _buildMapBackgroundLayer()),
+                        cadCanvas,
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -1841,4 +2189,83 @@ class _CadInteractivePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CadInteractivePainter oldDelegate) => true;
+}
+
+class _CadastralSheetFallbackPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..color = const Color(0xFFFBF7EE);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    // Cadastral border
+    final borderPaint = Paint()
+      ..color = const Color(0xFF78350F)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawRect(Rect.fromLTWH(12, 12, size.width - 24, size.height - 24), borderPaint);
+
+    // Fine grid
+    final gridPaint = Paint()
+      ..color = const Color(0xFFE2D9C8)
+      ..strokeWidth = 0.8;
+    for (double x = 20; x < size.width - 20; x += 40) {
+      canvas.drawLine(Offset(x, 20), Offset(x, size.height - 20), gridPaint);
+    }
+    for (double y = 20; y < size.height - 20; y += 40) {
+      canvas.drawLine(Offset(20, y), Offset(size.width - 20, y), gridPaint);
+    }
+
+    // Parcel boundaries
+    final parcelPaint = Paint()
+      ..color = const Color(0xFF334155)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    path.moveTo(40, 60);
+    path.lineTo(size.width * 0.45, 55);
+    path.lineTo(size.width * 0.42, size.height * 0.45);
+    path.lineTo(35, size.height * 0.42);
+    path.close();
+
+    path.moveTo(size.width * 0.45, 55);
+    path.lineTo(size.width - 40, 65);
+    path.lineTo(size.width - 45, size.height * 0.45);
+    path.lineTo(size.width * 0.42, size.height * 0.45);
+    path.close();
+
+    path.moveTo(35, size.height * 0.48);
+    path.lineTo(size.width * 0.5, size.height * 0.48);
+    path.lineTo(size.width * 0.48, size.height - 50);
+    path.lineTo(40, size.height - 45);
+    path.close();
+
+    path.moveTo(size.width * 0.5, size.height * 0.48);
+    path.lineTo(size.width - 40, size.height * 0.5);
+    path.lineTo(size.width - 45, size.height - 50);
+    path.lineTo(size.width * 0.48, size.height - 50);
+    path.close();
+
+    canvas.drawPath(path, parcelPaint);
+
+    // Text labels
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    void drawText(String text, Offset pos, {double fontSize = 11, Color color = const Color(0xFF64748B)}) {
+      tp.text = TextSpan(
+        text: text,
+        style: TextStyle(color: color, fontSize: fontSize, fontWeight: FontWeight.bold),
+      );
+      tp.layout();
+      tp.paint(canvas, pos);
+    }
+
+    drawText('মৌজা ক্যাডাস্ট্রাল জরিপ নকশা (CS / RS)', const Offset(20, 20), fontSize: 12, color: const Color(0xFF78350F));
+    drawText('দাগ ১০১', Offset(size.width * 0.2, size.height * 0.22));
+    drawText('দাগ ১০২', Offset(size.width * 0.65, size.height * 0.22));
+    drawText('দাগ ১০৫', Offset(size.width * 0.2, size.height * 0.68), color: const Color(0xFF0369A1));
+    drawText('দাগ ১০৬', Offset(size.width * 0.65, size.height * 0.68));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

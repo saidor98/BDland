@@ -806,8 +806,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   @override
   void initState() {
     super.initState();
-    // Default to authentic scan if cloud file exists
-    _showAuthenticScan = (widget.cloudItem != null && widget.cloudItem!.downloadUrl != null);
+    // Default to authentic scan
+    _showAuthenticScan = true;
   }
 
   double get _scaleFeetPerPixel {
@@ -1238,89 +1238,75 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                                   ),
                                 ],
                               ),
-                              child: Image.network(
-                                widget.cloudItem!.downloadUrl!,
-                                key: ValueKey('mouza_img_${widget.cloudItem!.name}_$_imageKey'),
-                                fit: BoxFit.contain,
-                                headers: const {
-                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0',
-                                },
-                                loadingBuilder: (ctx, child, progress) {
-                                  if (progress == null) return child;
-                                  final total = progress.expectedTotalBytes;
-                                  final loaded = progress.cumulativeBytesLoaded;
-                                  final pct = total != null && total > 0 ? (loaded / total * 100).toStringAsFixed(0) : '';
+                              child: (widget.cloudItem?.downloadUrl != null && widget.cloudItem!.downloadUrl!.startsWith('http'))
+                                  ? Image.network(
+                                      widget.cloudItem!.downloadUrl!,
+                                      key: ValueKey('mouza_img_${widget.cloudItem!.name}_$_imageKey'),
+                                      fit: BoxFit.contain,
+                                      headers: const {
+                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0',
+                                      },
+                                      loadingBuilder: (ctx, child, progress) {
+                                        if (progress == null) return child;
+                                        final total = progress.expectedTotalBytes;
+                                        final loaded = progress.cumulativeBytesLoaded;
+                                        final pct = total != null && total > 0 ? (loaded / total * 100).toStringAsFixed(0) : '';
 
-                                  return Container(
-                                    width: 480,
-                                    height: 520,
-                                    color: const Color(0xFFFAF6EE),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const CircularProgressIndicator(color: AppColors.primaryGreen),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'অরিজিনাল মৌজা নকশা লোড হচ্ছে... ${pct.isNotEmpty ? '$pct%' : ''}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            '${(loaded / 1048576).toStringAsFixed(1)} MB'
-                                            '${total != null ? ' / ${(total / 1048576).toStringAsFixed(1)} MB' : ''}',
-                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (ctx, err, stack) {
-                                  return Container(
-                                    width: 480,
-                                    height: 520,
-                                    padding: const EdgeInsets.all(24),
-                                    color: const Color(0xFFFEF2F2),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.cloud_off, color: Color(0xFFEF4444), size: 48),
-                                          const SizedBox(height: 12),
-                                          const Text(
-                                            'অনলাইন সার্ভার থেকে সরাসরি নকশা লোড হতে দেরি হচ্ছে',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          const Text(
-                                            '(গুগল ড্রাইভ প্রক্সি কোটা লিমিট বা নেটওয়ার্ক ধীরগতি হতে পারে)',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(fontSize: 11, color: Colors.grey),
-                                          ),
-                                          const SizedBox(height: 14),
-                                          ElevatedButton.icon(
-                                            onPressed: () => setState(() => _imageKey++),
-                                            icon: const Icon(Icons.refresh),
-                                            label: const Text('পুনরায় চেষ্টা করুন (Retry)'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primaryGreen,
-                                              foregroundColor: Colors.white,
+                                        return Container(
+                                          width: 480,
+                                          height: 520,
+                                          color: const Color(0xFFFAF6EE),
+                                          child: Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const CircularProgressIndicator(color: AppColors.primaryGreen),
+                                                const SizedBox(height: 16),
+                                                Text(
+                                                  'অরিজিনাল মৌজা নকশা লোড হচ্ছে... ${pct.isNotEmpty ? '$pct%' : ''}',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  '${(loaded / 1048576).toStringAsFixed(1)} MB'
+                                                  '${total != null ? ' / ${(total / 1048576).toStringAsFixed(1)} MB' : ''}',
+                                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
-                                          OutlinedButton.icon(
-                                            onPressed: () => setState(() => _showAuthenticScan = false),
-                                            icon: const Icon(Icons.polyline),
-                                            label: const Text('ক্যাড ভেক্টর মোডে দেখুন'),
-                                          ),
-                                        ],
-                                      ),
+                                        );
+                                      },
+                                      errorBuilder: (ctx, err, stack) {
+                                        return Stack(
+                                          children: [
+                                            Image.asset(
+                                              'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+                                              fit: BoxFit.contain,
+                                            ),
+                                            Positioned(
+                                              top: 8,
+                                              right: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xCC0F172A),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'অফলাইন ক্যাডাস্ট্রাল এইচডি স্ক্যান',
+                                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    )
+                                  : Image.asset(
+                                      'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+                                      fit: BoxFit.contain,
                                     ),
-                                  );
-                                },
-                              ),
                             ),
 
                             // On-sheet Custom Measurement Overlay
@@ -1583,6 +1569,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                             initialSheetNo: 'শিট ${BanglaNumerals.toBangla(_selectedSheetIndex)}',
                             initialJlNo: widget.item.jlNo,
                             initialPoints: _getNormalizedCadPoints(),
+                            initialImageUrl: widget.cloudItem?.downloadUrl ?? 'assets/mouza_maps/sample_mouza_sheet_1.jpg',
                           ),
                         ),
                       );

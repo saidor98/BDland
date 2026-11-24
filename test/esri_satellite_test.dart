@@ -355,7 +355,7 @@ class _MockHttpClientRequest extends Fake implements HttpClientRequest {
 
 class _MockHttpHeaders extends Fake implements HttpHeaders {
   @override
-  void set(String name, Object value) {}
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {}
 }
 
 class _MockHttpClientResponse extends Fake implements HttpClientResponse {

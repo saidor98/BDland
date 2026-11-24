@@ -32,6 +32,163 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
   int _divisionParts = 2; // Split into 2 shares
   QuadrilateralResult? _result;
 
+  final List<Map<String, String>> _undoStack = [];
+  final List<Map<String, String>> _redoStack = [];
+
+  void _pushUndoState() {
+    _undoStack.add({
+      'n': _northCtrl.text,
+      's': _southCtrl.text,
+      'e': _eastCtrl.text,
+      'w': _westCtrl.text,
+      'dx': _diagXCtrl.text,
+      'dy': _diagYCtrl.text,
+    });
+    if (_undoStack.length > 20) _undoStack.removeAt(0);
+    _redoStack.clear();
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('আর পূর্বাবস্থায় ফেরার তথ্য নেই'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    _redoStack.add({
+      'n': _northCtrl.text,
+      's': _southCtrl.text,
+      'e': _eastCtrl.text,
+      'w': _westCtrl.text,
+      'dx': _diagXCtrl.text,
+      'dy': _diagYCtrl.text,
+    });
+    final prev = _undoStack.removeLast();
+    _northCtrl.text = prev['n']!;
+    _southCtrl.text = prev['s']!;
+    _eastCtrl.text = prev['e']!;
+    _westCtrl.text = prev['w']!;
+    _diagXCtrl.text = prev['dx']!;
+    _diagYCtrl.text = prev['dy']!;
+    _calculate();
+    setState(() {});
+  }
+
+  void _redo() {
+    if (_redoStack.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('সামনে যাওয়ার তথ্য নেই'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    _undoStack.add({
+      'n': _northCtrl.text,
+      's': _southCtrl.text,
+      'e': _eastCtrl.text,
+      'w': _westCtrl.text,
+      'dx': _diagXCtrl.text,
+      'dy': _diagYCtrl.text,
+    });
+    final next = _redoStack.removeLast();
+    _northCtrl.text = next['n']!;
+    _southCtrl.text = next['s']!;
+    _eastCtrl.text = next['e']!;
+    _westCtrl.text = next['w']!;
+    _diagXCtrl.text = next['dx']!;
+    _diagYCtrl.text = next['dy']!;
+    _calculate();
+    setState(() {});
+  }
+
+  void _showTutorialGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.school, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('চতুর্ভুজ পরিমাপ প্রশিক্ষণ গাইড', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '১. বিষমবাহু চতুর্ভুজ ও কর্ণ পদ্ধতি:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'যেকোনো চারকোনা জমির প্রকৃত ক্ষেত্রফল বের করতে কর্ণ (Diagonal) মেপে জমিকে দুটি ত্রিভুজে বিভক্ত করে হেরন সূত্রে ক্ষেত্রফল বের করতে হয়।',
+                style: TextStyle(fontSize: 12, color: Color(0xFF334155)),
+              ),
+              SizedBox(height: 10),
+              Text(
+                '২. আমিনের গড় পদ্ধতির মারাত্মক ভুল:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFDC2626)),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'উত্তর+দক্ষিণ/২ × পূর্ব+পশ্চিম/২ করলে প্রকৃত ক্ষেত্রফলের চেয়ে জমি বেশি বা কম দেখায়। এটি আদালত বা সরকার কর্তৃক স্বীকৃত নয়।',
+                style: TextStyle(fontSize: 12, color: Color(0xFF334155)),
+              ),
+              SizedBox(height: 10),
+              Text(
+                '৩. ত্রিভুজীয় অসমতা নিয়ম:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0369A1)),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'কর্ণের মান সবসময় অপর দুই বাহুর যোগফলের চেয়ে ছোট এবং বিয়োগফলের চেয়ে বড় হতে হবে।',
+                style: TextStyle(fontSize: 12, color: Color(0xFF334155)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি')),
+        ],
+      ),
+    );
+  }
+
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.settings, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('হিসাব ও ডিসপ্লে সেটিংস', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              dense: true,
+              leading: Icon(Icons.calculate, color: Color(0xFF0284C7)),
+              title: Text('পদ্ধতি: হেরন সূত্র (আইনসম্মত ও নিখুঁত)'),
+              subtitle: Text('কর্ণসহ দুটি স্বতন্ত্র ত্রিভুজ সমাধান'),
+            ),
+            ListTile(
+              dense: true,
+              leading: Icon(Icons.straighten, color: Color(0xFF16A34A)),
+              title: Text('একক রূপান্তর: ফুট ↔ লিংক ↔ শতাংশ'),
+              subtitle: Text('১ শতক = ৪৩৫.৬০ বর্গফুট = ১০০০ বর্গলিংক'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ঠিক আছে')),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -131,19 +288,18 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.undo, color: Color(0xFF334155), size: 20),
-            onPressed: () {},
+            tooltip: 'পূর্বাবস্থা (Undo)',
+            onPressed: _undo,
           ),
           IconButton(
             icon: const Icon(Icons.redo, color: Color(0xFF334155), size: 20),
-            onPressed: () {},
+            tooltip: 'পুনরাবৃত্তি (Redo)',
+            onPressed: _redo,
           ),
           IconButton(
             icon: const Icon(Icons.play_circle_fill, color: Colors.red, size: 22),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('চতুর্ভুজ পরিমাপের ভিডিও টিউটোরিয়াল চালু হচ্ছে...')),
-              );
-            },
+            tooltip: 'প্রশিক্ষণ ও নিয়মাবলি',
+            onPressed: _showTutorialGuideDialog,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Color(0xFF334155)),
@@ -244,7 +400,8 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.settings, color: Color(0xFF64748B), size: 18),
-                  onPressed: () {},
+                  tooltip: 'সেটিংস',
+                  onPressed: _showSettingsDialog,
                   padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
                 ),
@@ -304,7 +461,15 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
                 ],
               ),
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  _calculate();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('চতুর্ভুজ ক্যানভাসে স্বয়ংক্রিয়ভাবে ফিট করা হয়েছে'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.fullscreen, size: 14),
                 label: const Text('ফিট', style: TextStyle(fontSize: 12)),
                 style: ElevatedButton.styleFrom(
