@@ -846,7 +846,9 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    'পিন: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি',
+                    _selectedVertexIndex != null
+                        ? 'পয়েন্ট ${BanglaNumerals.toBangla(_selectedVertexIndex! + 1)} নির্বাচিত'
+                        : 'পিন: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ],

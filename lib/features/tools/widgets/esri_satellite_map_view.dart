@@ -587,9 +587,9 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
         final screenPoints = widget.surveyPoints.map((p) => _latLngToScreen(p, size)).toList();
 
         // Convert partition line to screen coordinates if present
-        final partitionScreenPoints = widget.partitionSplitLine != null
-            ? widget.partitionSplitLine!.map((p) => _latLngToScreen(p, size)).toList()
-            : null;
+        final partitionScreenPoints = widget.partitionSplitLine
+            ?.map((p) => _latLngToScreen(p, size))
+            .toList();
 
         return Stack(
           children: [

@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/services/mouza_cloud_service.dart';
 import '../02_mouza_simple/mouza_map_simple_screen.dart';
 import '../widgets/digital_gunia_scale.dart';
@@ -31,6 +32,70 @@ class MouzaDirectoryItem {
   });
 }
 
+/// Static fallback catalog for high-speed offline search
+const List<MouzaDirectoryItem> defaultMouzaCatalog = [
+  MouzaDirectoryItem(
+    division: 'ঢাকা',
+    district: 'ঢাকা',
+    upazila: 'ধানমন্ডি',
+    mouzaName: 'জাফরাবাদ',
+    jlNo: '১২২',
+    surveyType: 'RS / City Survey',
+    totalSheets: 4,
+    totalPlots: 1250,
+  ),
+  MouzaDirectoryItem(
+    division: 'ঢাকা',
+    district: 'গাজীপুর',
+    upazila: 'শ্রীপুর',
+    mouzaName: 'মাওনা',
+    jlNo: '৫৬',
+    surveyType: 'RS / BS',
+    totalSheets: 6,
+    totalPlots: 2400,
+  ),
+  MouzaDirectoryItem(
+    division: 'ঢাকা',
+    district: 'নারায়ণগঞ্জ',
+    upazila: 'সোনারগাঁ',
+    mouzaName: 'আমিনপুর',
+    jlNo: '৩৪',
+    surveyType: 'CS / RS',
+    totalSheets: 3,
+    totalPlots: 850,
+  ),
+  MouzaDirectoryItem(
+    division: 'চট্টগ্রাম',
+    district: 'চট্টগ্রাম',
+    upazila: 'পটিয়া',
+    mouzaName: 'কুসুমপুরা',
+    jlNo: '৮৯',
+    surveyType: 'RS',
+    totalSheets: 3,
+    totalPlots: 980,
+  ),
+  MouzaDirectoryItem(
+    division: 'সিলেট',
+    district: 'সিলেট',
+    upazila: 'গোলাপগঞ্জ',
+    mouzaName: 'বাঘা',
+    jlNo: '৭৮',
+    surveyType: 'CS / RS',
+    totalSheets: 4,
+    totalPlots: 1100,
+  ),
+  MouzaDirectoryItem(
+    division: 'রাজশাহী',
+    district: 'বগুড়া',
+    upazila: 'শেরপুর',
+    mouzaName: 'ভবানীপুর',
+    jlNo: '১০২',
+    surveyType: 'RS / BS',
+    totalSheets: 3,
+    totalPlots: 890,
+  ),
+];
+
 class AllMouzaMapsScreen extends StatefulWidget {
   const AllMouzaMapsScreen({super.key});
 
@@ -53,130 +118,6 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
   String _searchQuery = '';
 
   final MouzaCloudService _cloudService = MouzaCloudService();
-
-  // Static fallback catalog for high-speed offline search
-  static const List<MouzaDirectoryItem> mouzaCatalog = [
-    MouzaDirectoryItem(
-      division: 'ঢাকা',
-      district: 'ঢাকা',
-      upazila: 'ধানমন্ডি',
-      mouzaName: 'জাফরাবাদ',
-      jlNo: '১২২',
-      surveyType: 'RS / City Survey',
-      totalSheets: 4,
-      totalPlots: 1250,
-    ),
-    MouzaDirectoryItem(
-      division: 'ঢাকা',
-      district: 'গাজীপুর',
-      upazila: 'শ্রীপুর',
-      mouzaName: 'মাওনা',
-      jlNo: '৫৬',
-      surveyType: 'RS / BS',
-      totalSheets: 6,
-      totalPlots: 2400,
-    ),
-    MouzaDirectoryItem(
-      division: 'ঢাকা',
-      district: 'নারায়ণগঞ্জ',
-      upazila: 'সোনারগাঁ',
-      mouzaName: 'আমিনপুর',
-      jlNo: '৩৪',
-      surveyType: 'CS / RS',
-      totalSheets: 3,
-      totalPlots: 850,
-    ),
-    MouzaDirectoryItem(
-      division: 'চট্টগ্রাম',
-      district: 'চট্টগ্রাম',
-      upazila: 'পটিয়া',
-      mouzaName: 'কুসুমপুরা',
-      jlNo: '৮৯',
-      surveyType: 'RS',
-      totalSheets: 3,
-      totalPlots: 980,
-    ),
-    MouzaDirectoryItem(
-      division: 'চট্টগ্রাম',
-      district: 'কুমিল্লা',
-      upazila: 'বুড়িচং',
-      mouzaName: 'কংশনগর',
-      jlNo: '৩৪',
-      surveyType: 'SA / RS',
-      totalSheets: 5,
-      totalPlots: 1600,
-    ),
-    MouzaDirectoryItem(
-      division: 'চট্টগ্রাম',
-      district: 'কক্সবাজার',
-      upazila: 'রামু',
-      mouzaName: 'ফতেখাঁরকুল',
-      jlNo: '১২',
-      surveyType: 'BS',
-      totalSheets: 4,
-      totalPlots: 1320,
-    ),
-    MouzaDirectoryItem(
-      division: 'সিলেট',
-      district: 'সিলেট',
-      upazila: 'গোলাপগঞ্জ',
-      mouzaName: 'বাঘা',
-      jlNo: '৭৮',
-      surveyType: 'CS / RS',
-      totalSheets: 4,
-      totalPlots: 1100,
-    ),
-    MouzaDirectoryItem(
-      division: 'রাজশাহী',
-      district: 'বগুড়া',
-      upazila: 'শেরপুর',
-      mouzaName: 'ভবানীপুর',
-      jlNo: '১০২',
-      surveyType: 'RS / BS',
-      totalSheets: 3,
-      totalPlots: 890,
-    ),
-    MouzaDirectoryItem(
-      division: 'খুলনা',
-      district: 'যশোর',
-      upazila: 'ঝিকরগাছা',
-      mouzaName: 'গদখালী',
-      jlNo: '৪৫',
-      surveyType: 'RS',
-      totalSheets: 4,
-      totalPlots: 1450,
-    ),
-    MouzaDirectoryItem(
-      division: 'বরিশাল',
-      district: 'বরিশাল',
-      upazila: 'বাবুগঞ্জ',
-      mouzaName: 'রহমতপুর',
-      jlNo: '৬৭',
-      surveyType: 'SA / RS',
-      totalSheets: 3,
-      totalPlots: 780,
-    ),
-    MouzaDirectoryItem(
-      division: 'রংপুর',
-      district: 'দিনাজপুর',
-      upazila: 'বীরগঞ্জ',
-      mouzaName: 'সুজালপুর',
-      jlNo: '৮১',
-      surveyType: 'CS / RS',
-      totalSheets: 5,
-      totalPlots: 1820,
-    ),
-    MouzaDirectoryItem(
-      division: 'ময়মনসিংহ',
-      district: 'ময়মনসিংহ',
-      upazila: 'ত্রিশাল',
-      mouzaName: 'রামপুর',
-      jlNo: '২৯',
-      surveyType: 'RS / BS',
-      totalSheets: 4,
-      totalPlots: 1340,
-    ),
-  ];
 
   @override
   void initState() {
@@ -1110,6 +1051,20 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                               child: Text(
                                 widget.cloudItem!.name.endsWith('.pdf') ? 'PDF নকশা' : 'অরিজিনাল স্ক্যান',
                                 style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                          if (_downloadedFilePath != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0x3310B981),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'সংরক্ষিত',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF4ADE80), fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
