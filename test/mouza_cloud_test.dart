@@ -79,7 +79,7 @@ void main() {
         'name': 'sheet_1.pdf',
         'link': 'files/sheet_1.pdf',
       }, 0, 'Dhaka');
-      expect(itemRelative.downloadUrl, equals('https://free.mouzamap.tech/api/files/sheet_1.pdf'));
+      expect(itemRelative.downloadUrl, equals('https://free.mouzamap.tech/files/sheet_1.pdf'));
 
       final itemRootRelative = MouzaCloudItem.fromJson({
         'name': 'sheet_2.pdf',

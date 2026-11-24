@@ -34,7 +34,7 @@ class MouzaCloudItem {
         : (link != null
             ? (link.startsWith('http://') || link.startsWith('https://')
                 ? link
-                : Uri.parse('$baseUrl/').resolve(link).toString())
+                : Uri.parse('${MouzaCloudService.baseUrl}/').resolve(link).toString())
             : 'https://free.mouzamap.tech/$driveIndex:/${subPath.split('/').map(Uri.encodeComponent).join('/')}');
 
     return MouzaCloudItem(

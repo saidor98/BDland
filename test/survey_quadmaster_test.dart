@@ -6,6 +6,13 @@ import 'package:bdland_pro/features/tools/widgets/touch_magnifier_loupe.dart';
 void main() {
   group('QuadMasterScreen Undo/Redo & Measurement Tests', () {
     testWidgets('QuadMaster records pre-edit state on input change and clears redo on new edit', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(
         const MaterialApp(
           home: QuadMasterScreen(),
