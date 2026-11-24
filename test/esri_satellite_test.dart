@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bdland_pro/core/config/map_config.dart';
 import 'package:bdland_pro/core/data/bangladesh_administrative_data.dart';
+import 'package:bdland_pro/core/services/admin_boundary_service.dart';
 import 'package:bdland_pro/features/tools/widgets/esri_satellite_map_view.dart';
 
 void main() {
@@ -47,6 +48,60 @@ void main() {
       final coxsBazarSearch = BangladeshAdministrativeData.searchDistricts("Cox's Bazar");
       expect(coxsBazarSearch, isNotEmpty);
       expect(coxsBazarSearch.first.bnName, equals('কক্স বাজার'));
+    });
+
+    test('BangladeshAdministrativeData contains 30 high-precision subdistricts/thanas', () {
+      expect(BangladeshAdministrativeData.subdistricts.length, equals(30));
+
+      final dhanmondi = BangladeshAdministrativeData.searchSubdistricts('ধানমন্ডি');
+      expect(dhanmondi, isNotEmpty);
+      expect(dhanmondi.first.name, equals('Dhanmondi'));
+      expect(dhanmondi.first.lat, closeTo(23.74, 0.05));
+
+      final gulshan = BangladeshAdministrativeData.searchSubdistricts('Gulshan');
+      expect(gulshan, isNotEmpty);
+      expect(gulshan.first.bnName, equals('গুলশান'));
+
+      final savar = BangladeshAdministrativeData.searchSubdistricts('সাভার');
+      expect(savar, isNotEmpty);
+      expect(savar.first.name, equals('Savar'));
+    });
+
+    test('AdminBoundaryService parses sample GeoJSON features', () async {
+      const sampleGeoJson = '''{
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {
+              "id": "20005629",
+              "level": 3,
+              "name_en": "Dhanmondi",
+              "name_bn": "ধানমন্ডি",
+              "type": "Subdistricts",
+              "bbox": [90.3664, 23.7311, 90.3931, 23.7585]
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [[90.3664, 23.7311], [90.3931, 23.7311], [90.3931, 23.7585], [90.3664, 23.7585], [90.3664, 23.7311]]
+              ]
+            }
+          }
+        ]
+      }''';
+
+      final service = AdminBoundaryService.instance;
+      final features = await service.loadBoundaries(sampleGeoJson);
+      expect(features.length, equals(1));
+
+      final feature = features.first;
+      expect(feature.nameEn, equals('Dhanmondi'));
+      expect(feature.nameBn, equals('ধানমন্ডি'));
+      expect(feature.level, equals(3));
+      expect(feature.rings.length, equals(1));
+      expect(feature.rings.first.length, equals(5));
+      expect(feature.centroid.latitude, closeTo(23.74, 0.05));
     });
 
     test('Web Mercator projection latLngToWorldPixels & worldPixelsToLatLng roundtrip', () {

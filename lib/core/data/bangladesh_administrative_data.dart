@@ -623,3 +623,256 @@ class BangladeshAdministrativeData {
     ).toList();
   }
 }
+  static const List<AdministrativeRegion> subdistricts = [
+    AdministrativeRegion(
+      id: '20005624',
+      divisionId: '3', // Dhaka Division
+      name: 'Badda',
+      bnName: 'বাড্ডা',
+      lat: 23.800517,
+      lng: 90.454107,
+    ),
+    AdministrativeRegion(
+      id: '20005625',
+      divisionId: '3', // Dhaka Division
+      name: 'Biman Bandar',
+      bnName: 'বিমানবন্দর',
+      lat: 23.834235,
+      lng: 90.388558,
+    ),
+    AdministrativeRegion(
+      id: '20005626',
+      divisionId: '3', // Dhaka Division
+      name: 'Cantonment',
+      bnName: 'ক্যান্টনমেন্ট',
+      lat: 23.822959,
+      lng: 90.38745,
+    ),
+    AdministrativeRegion(
+      id: '20005651',
+      divisionId: '3', // Dhaka Division
+      name: 'Dakshin Khan',
+      bnName: 'দক্ষিণখান',
+      lat: 23.860505,
+      lng: 90.428995,
+    ),
+    AdministrativeRegion(
+      id: '20005627',
+      divisionId: '3', // Dhaka Division
+      name: 'Demra',
+      bnName: 'ডেমরা',
+      lat: 23.727336,
+      lng: 90.470822,
+    ),
+    AdministrativeRegion(
+      id: '20005628',
+      divisionId: '3', // Dhaka Division
+      name: 'Dhamrai',
+      bnName: 'ধামরাই',
+      lat: 23.956808,
+      lng: 90.114764,
+    ),
+    AdministrativeRegion(
+      id: '20005629',
+      divisionId: '3', // Dhaka Division
+      name: 'Dhanmondi',
+      bnName: 'ধানমন্ডি',
+      lat: 23.744188,
+      lng: 90.376713,
+    ),
+    AdministrativeRegion(
+      id: '20005630',
+      divisionId: '3', // Dhaka Division
+      name: 'Dohar',
+      bnName: 'দোহার',
+      lat: 23.618596,
+      lng: 90.113524,
+    ),
+    AdministrativeRegion(
+      id: '20005631',
+      divisionId: '3', // Dhaka Division
+      name: 'Gulshan',
+      bnName: 'গুলশান',
+      lat: 23.78802,
+      lng: 90.415889,
+    ),
+    AdministrativeRegion(
+      id: '20005632',
+      divisionId: '3', // Dhaka Division
+      name: 'Hazaribagh',
+      bnName: 'হাজারীবাগ',
+      lat: 23.742585,
+      lng: 90.362546,
+    ),
+    AdministrativeRegion(
+      id: '20005633',
+      divisionId: '3', // Dhaka Division
+      name: 'Kafrul',
+      bnName: 'কাফরুল',
+      lat: 23.786581,
+      lng: 90.382232,
+    ),
+    AdministrativeRegion(
+      id: '20005634',
+      divisionId: '3', // Dhaka Division
+      name: 'Kamrangirchar',
+      bnName: 'কামরাঙ্গীরচর',
+      lat: 23.718833,
+      lng: 90.371542,
+    ),
+    AdministrativeRegion(
+      id: '20005636',
+      divisionId: '3', // Dhaka Division
+      name: 'Keraniganj',
+      bnName: 'কেরানীগঞ্জ',
+      lat: 23.711646,
+      lng: 90.327356,
+    ),
+    AdministrativeRegion(
+      id: '20005635',
+      divisionId: '3', // Dhaka Division
+      name: 'Khilgaon',
+      bnName: 'খিলগাঁও',
+      lat: 23.758093,
+      lng: 90.430166,
+    ),
+    AdministrativeRegion(
+      id: '20005637',
+      divisionId: '3', // Dhaka Division
+      name: 'Kotwali',
+      bnName: 'কোতোয়ালি',
+      lat: 23.714054,
+      lng: 90.405967,
+    ),
+    AdministrativeRegion(
+      id: '20005638',
+      divisionId: '3', // Dhaka Division
+      name: 'Lalbagh',
+      bnName: 'লালবাগ',
+      lat: 23.721837,
+      lng: 90.384443,
+    ),
+    AdministrativeRegion(
+      id: '20005639',
+      divisionId: '3', // Dhaka Division
+      name: 'Mirpur',
+      bnName: 'মিরপুর',
+      lat: 23.787378,
+      lng: 90.354465,
+    ),
+    AdministrativeRegion(
+      id: '20005640',
+      divisionId: '3', // Dhaka Division
+      name: 'Mohammadpur',
+      bnName: 'মোহাম্মদপুর',
+      lat: 23.757264,
+      lng: 90.347636,
+    ),
+    AdministrativeRegion(
+      id: '20005641',
+      divisionId: '3', // Dhaka Division
+      name: 'Motijheel',
+      bnName: 'মতিঝিল',
+      lat: 23.732595,
+      lng: 90.420259,
+    ),
+    AdministrativeRegion(
+      id: '20005642',
+      divisionId: '3', // Dhaka Division
+      name: 'Nawabganj',
+      bnName: 'নবাবগঞ্জ',
+      lat: 23.665194,
+      lng: 90.131679,
+    ),
+    AdministrativeRegion(
+      id: '20005643',
+      divisionId: '3', // Dhaka Division
+      name: 'Pallabi',
+      bnName: 'পল্লবী',
+      lat: 23.82791,
+      lng: 90.353206,
+    ),
+    AdministrativeRegion(
+      id: '20005644',
+      divisionId: '3', // Dhaka Division
+      name: 'Ramna',
+      bnName: 'রমনা',
+      lat: 23.744199,
+      lng: 90.402777,
+    ),
+    AdministrativeRegion(
+      id: '20005645',
+      divisionId: '3', // Dhaka Division
+      name: 'Sabujbagh',
+      bnName: 'সবুজবাগ',
+      lat: 23.746777,
+      lng: 90.452954,
+    ),
+    AdministrativeRegion(
+      id: '20005646',
+      divisionId: '3', // Dhaka Division
+      name: 'Savar',
+      bnName: 'সাভার',
+      lat: 23.904426,
+      lng: 90.276052,
+    ),
+    AdministrativeRegion(
+      id: '20005647',
+      divisionId: '3', // Dhaka Division
+      name: 'Shyampur',
+      bnName: 'শ্যামপুর',
+      lat: 23.691635,
+      lng: 90.449329,
+    ),
+    AdministrativeRegion(
+      id: '20005648',
+      divisionId: '3', // Dhaka Division
+      name: 'Sutrapur',
+      bnName: 'সূত্রাপুর',
+      lat: 23.704104,
+      lng: 90.434956,
+    ),
+    AdministrativeRegion(
+      id: '20005649',
+      divisionId: '3', // Dhaka Division
+      name: 'Tejgaon',
+      bnName: 'তেজগাঁও',
+      lat: 23.762708,
+      lng: 90.392398,
+    ),
+    AdministrativeRegion(
+      id: '20005653',
+      divisionId: '3', // Dhaka Division
+      name: 'Turag',
+      bnName: 'তুরাগ',
+      lat: 23.87401,
+      lng: 90.374128,
+    ),
+    AdministrativeRegion(
+      id: '20005652',
+      divisionId: '3', // Dhaka Division
+      name: 'Uttar Khan',
+      bnName: 'উত্তরখান',
+      lat: 23.87259,
+      lng: 90.442511,
+    ),
+    AdministrativeRegion(
+      id: '20005650',
+      divisionId: '3', // Dhaka Division
+      name: 'Uttara',
+      bnName: 'উত্তরা',
+      lat: 23.870127,
+      lng: 90.393152,
+    ),
+  ];
+
+  static List<AdministrativeRegion> searchSubdistricts(String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return subdistricts;
+    return subdistricts.where((s) =>
+      s.name.toLowerCase().contains(q) ||
+      s.bnName.contains(q)
+    ).toList();
+  }
+
+}

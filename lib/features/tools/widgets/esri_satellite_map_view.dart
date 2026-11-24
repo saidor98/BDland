@@ -656,7 +656,7 @@ class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with S
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -668,6 +668,7 @@ class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with S
   @override
   Widget build(BuildContext context) {
     final filteredDistricts = BangladeshAdministrativeData.searchDistricts(_searchQuery);
+    final filteredSubdistricts = BangladeshAdministrativeData.searchSubdistricts(_searchQuery);
 
     return AlertDialog(
       title: Column(
@@ -676,7 +677,7 @@ class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with S
             children: [
               Icon(Icons.location_searching, color: AppColors.primaryGreen),
               SizedBox(width: 8),
-              Text('বাংলাদেশ ভৌগোলিক অবস্থান (GeoJSON)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('বাংলাদেশ ভৌগোলিক অবস্থান (Shapefile/GeoJSON)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -688,6 +689,7 @@ class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with S
             tabs: const [
               Tab(text: '৮ বিভাগ'),
               Tab(text: '৬৪ জেলা'),
+              Tab(text: '৩০ থানা'),
               Tab(text: 'মৌজা হটস্পট'),
             ],
           ),
@@ -766,7 +768,47 @@ class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with S
               ],
             ),
 
-            // Tab 3: Mouza Hotspots
+            // Tab 3: 30 Thanas / Subdistricts (Shapefile High Precision)
+            Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'থানা / উপজেলা খুঁজুন (যেমন: ধানমন্ডি, গুলশান)...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: filteredSubdistricts.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, idx) {
+                      final sub = filteredSubdistricts[idx];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.share_location, size: 18, color: Color(0xFFD97706)),
+                        title: Text('${sub.bnName} (${sub.name})', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        subtitle: Text('ঢাকা জেলা | Lat: ${sub.lat.toStringAsFixed(4)}, Lng: ${sub.lng.toStringAsFixed(4)}', style: const TextStyle(fontSize: 11)),
+                        trailing: const Chip(
+                          label: Text('Shapefile CAD', style: TextStyle(fontSize: 10, color: Color(0xFF0284C7))),
+                          backgroundColor: Color(0xFFF0F9FF),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          widget.onSelectLocation(sub.lat, sub.lng, 16.5);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            // Tab 4: Mouza Hotspots
             ListView(
               children: [
                 _buildHotspotTile('সোনারগাঁও, নারায়ণগঞ্জ (আমিনপুর জে.এল. ৩৪)', 23.6472, 90.6015, 17.5),
