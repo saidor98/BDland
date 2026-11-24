@@ -176,9 +176,9 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     final bigha = decimal / 33.0;
 
     final buffer = StringBuffer();
-    buffer.writeln('=== ESRI স্যাটেলাইট জমি জরিপ রিপোর্ট ===');
+    buffer.writeln('=== Mapbox ও ESRI স্যাটেলাইট জমি জরিপ রিপোর্ট ===');
     buffer.writeln('তারিখ ও সময়: ${BanglaFormatter.formatDateTime(DateTime.now())}');
-    buffer.writeln('স্যাটেলাইট ইঞ্জিন: ESRI World Imagery (ArcGIS HD Tiles)');
+    buffer.writeln('স্যাটেলাইট ইঞ্জিন: Mapbox HD & ESRI World Imagery');
     buffer.writeln('পয়েন্ট সংখ্যা: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি (WGS84)');
     buffer.writeln('মোট পরিসীমা: ${BanglaFormatter.formatNumber(_perimeterFt, fractionDigits: 1)} ফুট');
     buffer.writeln('মোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 2)} বর্গফুট');
@@ -364,7 +364,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                         ),
                         const SizedBox(width: 6),
                         const Text(
-                          'RTK: FIX (14 Sats) | H: 0.012m | ESRI World Imagery',
+                          'RTK: FIX (14 Sats) | H: 0.012m | Mapbox & ESRI HD',
                           style: TextStyle(
                             color: Color(0xFFE2E8F0),
                             fontSize: 11,

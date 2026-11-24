@@ -1,11 +1,17 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../core/config/map_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/data/bangladesh_administrative_data.dart';
 import '../../../core/utils/bangla_formatter.dart';
 
 enum SatelliteLayerType {
   esriSatellite,
+  mapboxSatelliteStreets,
+  mapboxSatellitePure,
+  mapboxStreets,
+  mapboxOutdoors,
   esriTopo,
   osmRoads,
 }
@@ -20,7 +26,7 @@ class LatLngPoint {
   String toString() => '(${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)})';
 }
 
-/// Controller to programmatically control the ESRI Satellite Map
+/// Controller to programmatically control the ESRI/Mapbox Satellite Map
 class EsriMapController {
   _EsriSatelliteMapViewState? _state;
 
@@ -66,7 +72,7 @@ class EsriSatelliteMapView extends StatefulWidget {
     this.isDrawingMode = true,
     this.showDimensions = true,
     this.showAngles = true,
-    this.initialLayer = SatelliteLayerType.esriSatellite,
+    this.initialLayer = SatelliteLayerType.mapboxSatelliteStreets,
     this.initialCenter = const LatLngPoint(23.8103, 90.4125), // Dhaka, Bangladesh
     this.initialZoom = 17.0, // High-resolution cadastral survey level
     this.overlayChild,
@@ -190,13 +196,13 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
 
   void zoomIn() {
     setState(() {
-      _zoom = (_zoom + 0.5).clamp(12.0, 19.0);
+      _zoom = (_zoom + 0.5).clamp(10.0, 20.0);
     });
   }
 
   void zoomOut() {
     setState(() {
-      _zoom = (_zoom - 0.5).clamp(12.0, 19.0);
+      _zoom = (_zoom - 0.5).clamp(10.0, 20.0);
     });
   }
 
@@ -216,15 +222,39 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
 
   String _getTileUrl(int z, int x, int y) {
     switch (_activeLayer) {
+      case SatelliteLayerType.mapboxSatelliteStreets:
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, z, x, y);
+      case SatelliteLayerType.mapboxSatellitePure:
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatellitePureStyle, z, x, y);
+      case SatelliteLayerType.mapboxStreets:
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxStreetsStyle, z, x, y);
+      case SatelliteLayerType.mapboxOutdoors:
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxOutdoorsStyle, z, x, y);
       case SatelliteLayerType.esriSatellite:
-        // ESRI World Imagery live tile server (High-resolution free satellite)
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$y/$x';
+        return MapConfig.getEsriTileUrl(MapConfig.esriWorldImageryBase, z, x, y);
       case SatelliteLayerType.esriTopo:
-        // ESRI World Street / Topo Map
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/$z/$y/$x';
+        return MapConfig.getEsriTileUrl(MapConfig.esriWorldStreetBase, z, x, y);
       case SatelliteLayerType.osmRoads:
-        // OpenStreetMap standard tile server
-        return 'https://tile.openstreetmap.org/$z/$x/$y.png';
+        return MapConfig.getOsmTileUrl(z, x, y);
+    }
+  }
+
+  String _getLayerDisplayName() {
+    switch (_activeLayer) {
+      case SatelliteLayerType.mapboxSatelliteStreets:
+        return 'Mapbox স্যাটেলাইট ও পথঘাট (HD)';
+      case SatelliteLayerType.mapboxSatellitePure:
+        return 'Mapbox পিওর স্যাটেলাইট';
+      case SatelliteLayerType.mapboxStreets:
+        return 'Mapbox স্ট্রিট ও জরিপ ম্যাপ';
+      case SatelliteLayerType.mapboxOutdoors:
+        return 'Mapbox আউটডোর ও টপোগ্রাফি';
+      case SatelliteLayerType.esriSatellite:
+        return 'ESRI স্যাটেলাইট (HD Free)';
+      case SatelliteLayerType.esriTopo:
+        return 'ESRI টপোগ্রাফিক্যাল';
+      case SatelliteLayerType.osmRoads:
+        return 'OpenStreetMap (OSM)';
     }
   }
 
@@ -276,44 +306,10 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
   void showLocationJumpDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_city, color: AppColors.primaryGreen),
-            SizedBox(width: 8),
-            Text('বিভাগ ও জেলায় দ্রুত যান', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        children: [
-          _buildJumpTile('ঢাকা (ধানমন্ডি / গুলশান)', 23.8103, 90.4125),
-          _buildJumpTile('চট্টগ্রাম (পটিয়া / সদর)', 22.3569, 91.7832),
-          _buildJumpTile('সিলেট (জাফলং / সদর)', 24.8949, 91.8687),
-          _buildJumpTile('রাজশাহী (পদ্মা পার / সদর)', 24.3636, 88.6241),
-          _buildJumpTile('খুলনা (রূপসা / দৌলতপুর)', 22.8456, 89.5403),
-          _buildJumpTile('বরিশাল (কীর্তনখোলা / সদর)', 22.7010, 90.3535),
-          _buildJumpTile('রংপুর (তিস্তা / সদর)', 25.7439, 89.2752),
-          _buildJumpTile('ময়মনসিংহ (ব্রহ্মপুত্র / সদর)', 24.7471, 90.4203),
-          _buildJumpTile('সোনারগাঁও, নারায়ণগঞ্জ (আমিনপুর)', 23.6472, 90.6015),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildJumpTile(String title, double lat, double lng) {
-    return SimpleDialogOption(
-      onPressed: () {
-        Navigator.pop(context);
-        jumpTo(lat, lng);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            const Icon(Icons.pin_drop, size: 18, color: Color(0xFF0284C7)),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(fontSize: 13.5)),
-          ],
-        ),
+      builder: (ctx) => _LocationJumpTabsDialog(
+        onSelectLocation: (lat, lng, zoom) {
+          jumpTo(lat, lng, zoom: zoom);
+        },
       ),
     );
   }
@@ -326,49 +322,100 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
           children: [
             Icon(Icons.layers, color: AppColors.primaryGreen),
             SizedBox(width: 8),
-            Text('মানচিত্রের লেয়ার পরিবর্তন'),
+            Text('মানচিত্র ও স্যাটেলাইট লেয়ার'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<SatelliteLayerType>(
-              value: SatelliteLayerType.esriSatellite,
-              groupValue: _activeLayer,
-              title: const Text('ESRI হাই-রেজোলিউশন স্যাটেলাইট'),
-              subtitle: const Text('আসল স্যাটেলাইট ছবি (গাছপালা, ঘরবাড়ি, নদী ও সীমানা)'),
-              onChanged: (val) {
-                if (val != null) {
-                  setLayer(val);
-                  Navigator.pop(ctx);
-                }
-              },
-            ),
-            RadioListTile<SatelliteLayerType>(
-              value: SatelliteLayerType.esriTopo,
-              groupValue: _activeLayer,
-              title: const Text('ESRI টপোগ্রাফিক্যাল ও রোড ম্যাপ'),
-              subtitle: const Text('রাস্তাঘাট, মহাসড়ক ও ভৌগোলিক তথ্য'),
-              onChanged: (val) {
-                if (val != null) {
-                  setLayer(val);
-                  Navigator.pop(ctx);
-                }
-              },
-            ),
-            RadioListTile<SatelliteLayerType>(
-              value: SatelliteLayerType.osmRoads,
-              groupValue: _activeLayer,
-              title: const Text('OpenStreetMap (বাংলা রোড ও নদী)'),
-              subtitle: const Text('বিস্তারিত এলাকা ও মৌজা সীমানা লেবেল'),
-              onChanged: (val) {
-                if (val != null) {
-                  setLayer(val);
-                  Navigator.pop(ctx);
-                }
-              },
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.mapboxSatelliteStreets,
+                groupValue: _activeLayer,
+                title: const Text('Mapbox স্যাটেলাইট ও রাস্তাঘাট (HD)'),
+                subtitle: const Text('প্রিমিয়াম Mapbox হাই-রেজোলিউশন স্যাটেলাইট সাথে রোড ও প্লেস নেমস'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.mapboxSatellitePure,
+                groupValue: _activeLayer,
+                title: const Text('Mapbox পিওর স্যাটেলাইট'),
+                subtitle: const Text('অরিজিনাল স্যাটেলাইট ফটোগ্রাফি (কোনো টেক্সট বা লেবেল ছাড়া)'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.mapboxStreets,
+                groupValue: _activeLayer,
+                title: const Text('Mapbox স্ট্রিট ও জরিপ মানচিত্র'),
+                subtitle: const Text('রাস্তাঘাট, সীমানা ও মৌজা এলাকার স্পষ্ট ভেক্টর লেআউট'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.mapboxOutdoors,
+                groupValue: _activeLayer,
+                title: const Text('Mapbox আউটডোর ও টপোগ্রাফি'),
+                subtitle: const Text('উঁচু-নিচু ভূমি, কনট্যুর লাইন ও জলাশয়ের টপোগ্রাফিক ভিউ'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              const Divider(),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.esriSatellite,
+                groupValue: _activeLayer,
+                title: const Text('ESRI হাই-রেজোলিউশন স্যাটেলাইট'),
+                subtitle: const Text('আসল স্যাটেলাইট ছবি (গাছপালা, ঘরবাড়ি, নদী ও সীমানা)'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.esriTopo,
+                groupValue: _activeLayer,
+                title: const Text('ESRI টপোগ্রাফিক্যাল ও রোড ম্যাপ'),
+                subtitle: const Text('রাস্তাঘাট, মহাসড়ক ও ভৌগোলিক তথ্য'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              RadioListTile<SatelliteLayerType>(
+                value: SatelliteLayerType.osmRoads,
+                groupValue: _activeLayer,
+                title: const Text('OpenStreetMap (বাংলা রোড ও নদী)'),
+                subtitle: const Text('বিস্তারিত এলাকা ও মৌজা সীমানা লেবেল'),
+                onChanged: (val) {
+                  if (val != null) {
+                    setLayer(val);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -401,7 +448,6 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
             final screenLeft = (tx * 256.0) - centerWorld.dx + (size.width / 2.0);
             final screenTop = (ty * 256.0) - centerWorld.dy + (size.height / 2.0);
 
-            // ArcGIS MapServer tile format: {z}/{row}/{col} where row=y, col=x
             final tileUrl = _getTileUrl(intTileZoom, tx, ty);
 
             tiles.add(
@@ -484,7 +530,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
               ),
             ),
 
-            // 2. Top-Left: Active ESRI Satellite Layer Tag
+            // 2. Top-Left: Active Satellite Layer Tag
             if (widget.showControls && widget.showLayerTag)
               Positioned(
                 top: 12,
@@ -512,9 +558,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _activeLayer == SatelliteLayerType.esriSatellite
-                            ? 'ESRI স্যাটেলাইট (HD) | z${_zoom.toStringAsFixed(1)}'
-                            : (_activeLayer == SatelliteLayerType.esriTopo ? 'ESRI টপো ম্যাপ' : 'OpenStreetMap'),
+                        '${_getLayerDisplayName()} | z${_zoom.toStringAsFixed(1)}',
                         style: const TextStyle(
                           color: Color(0xFFE2E8F0),
                           fontSize: 11,
@@ -535,7 +579,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                   children: [
                     if (widget.showLayerSwitcher) ...[
                       FloatingActionButton.small(
-                        heroTag: 'esri_layer_btn',
+                        heroTag: 'map_layer_btn',
                         backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
                         foregroundColor: const Color(0xFF38BDF8),
                         onPressed: showLayerSelectorDialog,
@@ -546,11 +590,11 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                     ],
                     if (widget.showLocationJump)
                       FloatingActionButton.small(
-                        heroTag: 'esri_jump_btn',
+                        heroTag: 'map_jump_btn',
                         backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
                         foregroundColor: const Color(0xFFFBBF24),
                         onPressed: showLocationJumpDialog,
-                        tooltip: 'বিভাগ নির্বাচন',
+                        tooltip: 'বিভাগ ও জেলা নির্বাচন (GeoJSON)',
                         child: const Icon(Icons.location_searching, size: 20),
                       ),
                   ],
@@ -565,7 +609,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                 child: Column(
                   children: [
                     FloatingActionButton.small(
-                      heroTag: 'esri_zoom_in',
+                      heroTag: 'map_zoom_in',
                       backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
                       foregroundColor: Colors.white,
                       onPressed: zoomIn,
@@ -574,7 +618,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                     ),
                     const SizedBox(height: 6),
                     FloatingActionButton.small(
-                      heroTag: 'esri_zoom_out',
+                      heroTag: 'map_zoom_out',
                       backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
                       foregroundColor: Colors.white,
                       onPressed: zoomOut,
@@ -586,6 +630,169 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
               ),
           ],
         );
+      },
+    );
+  }
+}
+
+/// Dynamic Location Jump Dialog with Divisions (8) and Districts (64) Tabs
+class _LocationJumpTabsDialog extends StatefulWidget {
+  final void Function(double lat, double lng, double zoom) onSelectLocation;
+
+  const _LocationJumpTabsDialog({required this.onSelectLocation});
+
+  @override
+  State<_LocationJumpTabsDialog> createState() => _LocationJumpTabsDialogState();
+}
+
+class _LocationJumpTabsDialogState extends State<_LocationJumpTabsDialog> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredDistricts = BangladeshAdministrativeData.searchDistricts(_searchQuery);
+
+    return AlertDialog(
+      title: Column(
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.location_searching, color: AppColors.primaryGreen),
+              SizedBox(width: 8),
+              Text('বাংলাদেশ ভৌগোলিক অবস্থান (GeoJSON)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primaryGreen,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: AppColors.primaryGreen,
+            tabs: const [
+              Tab(text: '৮ বিভাগ'),
+              Tab(text: '৬৪ জেলা'),
+              Tab(text: 'মৌজা হটস্পট'),
+            ],
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 450,
+        height: 380,
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            // Tab 1: 8 Divisions
+            ListView.separated(
+              itemCount: BangladeshAdministrativeData.divisions.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, idx) {
+                final d = BangladeshAdministrativeData.divisions[idx];
+                final count = BangladeshAdministrativeData.getDistrictsByDivision(d.id).length;
+                return ListTile(
+                  dense: true,
+                  leading: const CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Color(0xFF0284C7),
+                    child: Icon(Icons.location_city, color: Colors.white, size: 16),
+                  ),
+                  title: Text('${d.bnName} (${d.name})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Lat: ${d.lat.toStringAsFixed(4)}, Lng: ${d.lng.toStringAsFixed(4)}'),
+                  trailing: Chip(
+                    label: Text('${BanglaNumerals.toBangla(count)} জেলা', style: const TextStyle(fontSize: 11)),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onSelectLocation(d.lat, d.lng, 14.5);
+                  },
+                );
+              },
+            ),
+
+            // Tab 2: 64 Districts with Live Search
+            Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'জেলা খুঁজুন (বাংলা বা ইংরেজি)...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: filteredDistricts.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, idx) {
+                      final dist = filteredDistricts[idx];
+                      final div = dist.divisionId != null
+                          ? BangladeshAdministrativeData.findDivisionById(dist.divisionId!)
+                          : null;
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.pin_drop, size: 18, color: Color(0xFF0284C7)),
+                        title: Text('${dist.bnName} (${dist.name})', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        subtitle: Text('${div != null ? "${div.bnName} বিভাগ | " : ""}Lat: ${dist.lat.toStringAsFixed(4)}, Lng: ${dist.lng.toStringAsFixed(4)}', style: const TextStyle(fontSize: 11)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          widget.onSelectLocation(dist.lat, dist.lng, 16.0);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            // Tab 3: Mouza Hotspots
+            ListView(
+              children: [
+                _buildHotspotTile('সোনারগাঁও, নারায়ণগঞ্জ (আমিনপুর জে.এল. ৩৪)', 23.6472, 90.6015, 17.5),
+                _buildHotspotTile('ধানমন্ডি, ঢাকা (জাফরাবাদ মৌজা)', 23.7500, 90.3667, 17.0),
+                _buildHotspotTile('রূপগঞ্জ, নারায়ণগঞ্জ (তারাব মৌজা)', 23.7167, 90.5167, 17.0),
+                _buildHotspotTile('শ্রীপুর, গাজীপুর (মাওনা মৌজা)', 24.1667, 90.4333, 17.0),
+                _buildHotspotTile('পটিয়া, চট্টগ্রাম (কুসুমপুরা মৌজা)', 22.2833, 91.9500, 17.0),
+                _buildHotspotTile('জাফলং, সিলেট (নদী ও পাথর কোয়ারি)', 25.1633, 92.0197, 16.5),
+                _buildHotspotTile('পদ্মা পার, রাজশাহী (সদর মৌজা)', 24.3636, 88.6241, 16.5),
+                _buildHotspotTile('রূপসা পার, খুলনা (দৌলতপুর)', 22.8456, 89.5403, 16.5),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('বন্ধ করুন')),
+      ],
+    );
+  }
+
+  Widget _buildHotspotTile(String name, double lat, double lng, double zoom) {
+    return ListTile(
+      dense: true,
+      leading: const Icon(Icons.explore, color: AppColors.secondaryGoldDark, size: 20),
+      title: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+      subtitle: Text('Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)} (z$zoom)'),
+      onTap: () {
+        Navigator.pop(context);
+        widget.onSelectLocation(lat, lng, zoom);
       },
     );
   }

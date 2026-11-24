@@ -1,9 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bdland_pro/core/config/map_config.dart';
+import 'package:bdland_pro/core/data/bangladesh_administrative_data.dart';
 import 'package:bdland_pro/features/tools/widgets/esri_satellite_map_view.dart';
 
 void main() {
-  group('ESRI Satellite Map View & Geodesic Math Tests', () {
+  group('Mapbox & ESRI Satellite Map View Tests', () {
+    test('MapConfig holds valid Mapbox token and builds valid tile URLs', () {
+      expect(MapConfig.mapboxAccessToken, startsWith('pk.ey'));
+      expect(MapConfig.mapboxAccessToken, contains('saidor68348'));
+
+      final tileUrl = MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, 14, 12306, 7104);
+      expect(tileUrl, contains('api.mapbox.com'));
+      expect(tileUrl, contains('satellite-streets-v12'));
+      expect(tileUrl, contains(MapConfig.mapboxAccessToken));
+
+      final esriUrl = MapConfig.getEsriTileUrl(MapConfig.esriWorldImageryBase, 17, 98455, 56838);
+      expect(esriUrl, contains('arcgisonline.com'));
+      expect(esriUrl, contains('World_Imagery'));
+      expect(esriUrl, endsWith('17/98455/56838'));
+    });
+
+    test('BangladeshAdministrativeData contains 8 divisions and 64 districts', () {
+      expect(BangladeshAdministrativeData.divisions.length, equals(8));
+      expect(BangladeshAdministrativeData.districts.length, equals(64));
+
+      // Verify Dhaka division and its districts
+      final dhakaDiv = BangladeshAdministrativeData.findDivisionById('3');
+      expect(dhakaDiv, isNotNull);
+      expect(dhakaDiv!.name, equals('Dhaka'));
+      expect(dhakaDiv.bnName, equals('ঢাকা'));
+      expect(dhakaDiv.lat, closeTo(23.81, 0.05));
+
+      final dhakaDistricts = BangladeshAdministrativeData.getDistrictsByDivision('3');
+      expect(dhakaDistricts.length, equals(13)); // Dhaka division has 13 districts
+
+      // Verify search
+      final narayanganjSearch = BangladeshAdministrativeData.searchDistricts('নারায়ণগঞ্জ');
+      expect(narayanganjSearch, isNotEmpty);
+      expect(narayanganjSearch.first.name, equals('Narayanganj'));
+
+      final boguraSearch = BangladeshAdministrativeData.searchDistricts('Bogura');
+      expect(boguraSearch, isNotEmpty);
+      expect(boguraSearch.first.bnName, contains('বগুড়া'));
+    });
+
     test('Web Mercator projection latLngToWorldPixels & worldPixelsToLatLng roundtrip', () {
       const lat = 23.8103; // Dhaka Latitude
       const lng = 90.4125; // Dhaka Longitude
@@ -26,13 +67,11 @@ void main() {
       final tileCoords = EsriSatelliteMapView.getTileCoords(lat, lng, zoom);
       expect(tileCoords.x, isPositive);
       expect(tileCoords.y, isPositive);
-      // For Dhaka at z=17, X should be around 98450-98465, Y around 56830-56845
       expect(tileCoords.x, inInclusiveRange(98000, 99000));
       expect(tileCoords.y, inInclusiveRange(56000, 57000));
     });
 
     test('Haversine distance calculation in feet', () {
-      // 1 minute of latitude (~6076 feet / 1 nautical mile)
       const p1 = LatLngPoint(23.8100, 90.4100);
       const p2 = LatLngPoint(23.826667, 90.4100); // 1 minute north
 
@@ -41,7 +80,6 @@ void main() {
     });
 
     test('Geodesic area calculation for Cadastral polygon', () {
-      // Approximate 100m x 100m (328 ft x 328 ft ~ 107,584 sq ft) square in Dhaka
       const lat = 23.8100;
       const lng = 90.4100;
       const dLat = 0.00090; // ~100 meters
@@ -56,7 +94,6 @@ void main() {
 
       final areaSqFt = EsriSatelliteMapView.calculateGeodesicAreaSqFt(points);
       expect(areaSqFt, isPositive);
-      // Area should be approximately 100,000 to 120,000 sq ft (~2.3 to 2.8 bigha)
       expect(areaSqFt, inInclusiveRange(90000.0, 130000.0));
 
       final areaDecimal = areaSqFt / 435.60;
@@ -64,7 +101,6 @@ void main() {
     });
 
     test('Interior angle calculation for right-angled corners', () {
-      // 90 degree corner: (0, 100) -> (0, 0) -> (100, 0)
       const prev = Offset(0, 100);
       const curr = Offset(0, 0);
       const next = Offset(100, 0);
@@ -74,7 +110,6 @@ void main() {
     });
 
     test('Interior angle calculation for 60 degree equilateral triangle corner', () {
-      // Angle between (1, 0) and (cos(60°), sin(60°)) = (0.5, 0.866)
       const prev = Offset(100, 0);
       const curr = Offset(0, 0);
       const next = Offset(50, 86.60254);

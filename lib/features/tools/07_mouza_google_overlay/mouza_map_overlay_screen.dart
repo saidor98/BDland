@@ -131,7 +131,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                         Icon(Icons.layers, color: Color(0xFF38BDF8), size: 14),
                         SizedBox(width: 6),
                         Text(
-                          'মৌজা: আমিনপুর (জে.এল. ৩৪) | ESRI স্যাটেলাইট ওভারলে',
+                          'মৌজা: আমিনপুর (জে.এল. ৩৪) | Mapbox ও ESRI স্যাটেলাইট',
                           style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ],
