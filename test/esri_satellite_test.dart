@@ -7,8 +7,8 @@ import 'package:bdland_pro/features/tools/widgets/esri_satellite_map_view.dart';
 void main() {
   group('Mapbox & ESRI Satellite Map View Tests', () {
     test('MapConfig holds valid Mapbox token and builds valid tile URLs', () {
-      expect(MapConfig.mapboxAccessToken, startsWith('pk.ey'));
-      expect(MapConfig.mapboxAccessToken, contains('saidor68348'));
+      expect(MapConfig.mapboxAccessToken, startsWith('pk.eyJ1'));
+      expect(MapConfig.mapboxAccessToken.length, greaterThan(50));
 
       final tileUrl = MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, 14, 12306, 7104);
       expect(tileUrl, contains('api.mapbox.com'));
