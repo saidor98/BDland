@@ -43,6 +43,10 @@ void main() {
       final boguraSearch = BangladeshAdministrativeData.searchDistricts('Bogura');
       expect(boguraSearch, isNotEmpty);
       expect(boguraSearch.first.bnName, contains('বগুড়া'));
+
+      final coxsBazarSearch = BangladeshAdministrativeData.searchDistricts("Cox's Bazar");
+      expect(coxsBazarSearch, isNotEmpty);
+      expect(coxsBazarSearch.first.bnName, equals('কক্স বাজার'));
     });
 
     test('Web Mercator projection latLngToWorldPixels & worldPixelsToLatLng roundtrip', () {

@@ -437,7 +437,7 @@ class BangladeshAdministrativeData {
     AdministrativeRegion(
       id: '45',
       divisionId: '2',
-      name: 'Cox's Bazar',
+      name: "Cox's Bazar",
       bnName: 'কক্স বাজার',
       lat: 21.4272,
       lng: 92.0058,
