@@ -190,6 +190,12 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
   LatLngPoint get currentCenter => LatLngPoint(_centerLat, _centerLng);
   int? get selectedVertexIndex => _selectedVertexIndex;
 
+  bool get _isMapboxActive =>
+      _activeLayer == SatelliteLayerType.mapboxSatelliteStreets ||
+      _activeLayer == SatelliteLayerType.mapboxSatellitePure ||
+      _activeLayer == SatelliteLayerType.mapboxStreets ||
+      _activeLayer == SatelliteLayerType.mapboxOutdoors;
+
   @override
   void initState() {
     super.initState();
@@ -522,15 +528,17 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
 
-        // Calculate tile coverage
-        final centerWorld = EsriSatelliteMapView.latLngToWorldPixels(_centerLat, _centerLng, _zoom);
+        // Calculate tile coverage at floor(_zoom) and scale by 2^(_zoom - intTileZoom)
         final intTileZoom = _zoom.floor();
+        final scale = math.pow(2.0, _zoom - intTileZoom).toDouble();
+        final centerWorldBase = EsriSatelliteMapView.latLngToWorldPixels(_centerLat, _centerLng, intTileZoom.toDouble());
+        final tileSize = 256.0 * scale;
 
-        // Viewport bounds in world pixels
-        final minWorldX = centerWorld.dx - (size.width / 2.0);
-        final maxWorldX = centerWorld.dx + (size.width / 2.0);
-        final minWorldY = centerWorld.dy - (size.height / 2.0);
-        final maxWorldY = centerWorld.dy + (size.height / 2.0);
+        // Viewport bounds in base tile coordinate space (at intTileZoom)
+        final minWorldX = centerWorldBase.dx - (size.width / (2.0 * scale));
+        final maxWorldX = centerWorldBase.dx + (size.width / (2.0 * scale));
+        final minWorldY = centerWorldBase.dy - (size.height / (2.0 * scale));
+        final maxWorldY = centerWorldBase.dy + (size.height / (2.0 * scale));
 
         final minTileX = (minWorldX / 256.0).floor();
         final maxTileX = (maxWorldX / 256.0).floor();
@@ -540,8 +548,8 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
         final tiles = <Widget>[];
         for (int tx = minTileX; tx <= maxTileX; tx++) {
           for (int ty = minTileY; ty <= maxTileY; ty++) {
-            final screenLeft = (tx * 256.0) - centerWorld.dx + (size.width / 2.0);
-            final screenTop = (ty * 256.0) - centerWorld.dy + (size.height / 2.0);
+            final screenLeft = (tx * 256.0 - centerWorldBase.dx) * scale + (size.width / 2.0);
+            final screenTop = (ty * 256.0 - centerWorldBase.dy) * scale + (size.height / 2.0);
 
             final tileUrl = _getTileUrl(intTileZoom, tx, ty);
 
@@ -549,8 +557,8 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
               Positioned(
                 left: screenLeft,
                 top: screenTop,
-                width: 256,
-                height: 256,
+                width: tileSize,
+                height: tileSize,
                 child: Image.network(
                   tileUrl,
                   fit: BoxFit.cover,
@@ -842,6 +850,69 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                   ],
                 ),
               ),
+
+            // Provider-aware Attribution Badge (Independent of showControls)
+            Positioned(
+              left: 8,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xB3000000),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isMapboxActive) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: const Text(
+                          'mapbox',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Text(
+                        '© Mapbox © OpenStreetMap',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else if (_activeLayer == SatelliteLayerType.osmRoads) ...[
+                      const Text(
+                        '© OpenStreetMap contributors',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        '© Esri, Maxar, Earthstar Geographics',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         );
       },

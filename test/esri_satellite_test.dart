@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bdland_pro/core/config/map_config.dart';
 import 'package:bdland_pro/core/data/bangladesh_administrative_data.dart';
@@ -186,6 +187,20 @@ void main() {
       expect(controller.currentCenter.latitude, closeTo(23.81, 0.05));
       expect(controller.currentCenter.longitude, closeTo(90.41, 0.05));
       expect(controller.selectedVertexIndex, isNull);
+    });
+
+    test('Fractional zoom world pixel projection scales proportionally by 2^(zoom - floor(zoom))', () {
+      const lat = 23.8103;
+      const lng = 90.4125;
+      const baseZoom = 14.0;
+      const fractionalZoom = 14.5;
+
+      final baseWorldPx = EsriSatelliteMapView.latLngToWorldPixels(lat, lng, baseZoom);
+      final fracWorldPx = EsriSatelliteMapView.latLngToWorldPixels(lat, lng, fractionalZoom);
+
+      final expectedScale = math.pow(2.0, fractionalZoom - baseZoom);
+      expect(fracWorldPx.dx, closeTo(baseWorldPx.dx * expectedScale, 0.001));
+      expect(fracWorldPx.dy, closeTo(baseWorldPx.dy * expectedScale, 0.001));
     });
   });
 }
