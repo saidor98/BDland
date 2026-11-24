@@ -622,7 +622,7 @@ class BangladeshAdministrativeData {
       d.bnName.contains(q)
     ).toList();
   }
-}
+
   static const List<AdministrativeRegion> subdistricts = [
     AdministrativeRegion(
       id: '20005624',
