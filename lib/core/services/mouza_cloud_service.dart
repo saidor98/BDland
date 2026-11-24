@@ -32,7 +32,9 @@ class MouzaCloudItem {
     final downloadUrl = isFolder
         ? null
         : (link != null
-            ? (link.startsWith('http') ? link : 'https://free.mouzamap.tech$link')
+            ? (link.startsWith('http://') || link.startsWith('https://')
+                ? link
+                : Uri.parse('$baseUrl/').resolve(link).toString())
             : 'https://free.mouzamap.tech/$driveIndex:/${subPath.split('/').map(Uri.encodeComponent).join('/')}');
 
     return MouzaCloudItem(

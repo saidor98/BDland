@@ -73,5 +73,25 @@ void main() {
       final katha = areaSqFt / 720.00;
       expect(katha, closeTo(45.83, 0.01));
     });
+
+    test('MouzaCloudItem resolves relative, root-relative, and absolute URLs properly', () {
+      final itemRelative = MouzaCloudItem.fromJson({
+        'name': 'sheet_1.pdf',
+        'link': 'files/sheet_1.pdf',
+      }, 0, 'Dhaka');
+      expect(itemRelative.downloadUrl, equals('https://free.mouzamap.tech/api/files/sheet_1.pdf'));
+
+      final itemRootRelative = MouzaCloudItem.fromJson({
+        'name': 'sheet_2.pdf',
+        'link': '/files/sheet_2.pdf',
+      }, 0, 'Dhaka');
+      expect(itemRootRelative.downloadUrl, equals('https://free.mouzamap.tech/files/sheet_2.pdf'));
+
+      final itemAbsolute = MouzaCloudItem.fromJson({
+        'name': 'external.jpg',
+        'link': 'https://custom-host.com/images/external.jpg',
+      }, 0, 'Dhaka');
+      expect(itemAbsolute.downloadUrl, equals('https://custom-host.com/images/external.jpg'));
+    });
   });
 }

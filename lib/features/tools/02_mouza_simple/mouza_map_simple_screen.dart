@@ -49,6 +49,48 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   double _sheetOpacity = 0.85;
   String? _customSheetImageUrl;
 
+  Widget _buildSheetErrorState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.red.shade400),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.broken_image_outlined, color: Colors.redAccent, size: 40),
+            const SizedBox(height: 10),
+            Text(
+              'নকশা শিট লোড ব্যর্থ হয়েছে ($_activeSheet)',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'সার্ভার সংযোগ বিচ্ছিন্ন বা নির্দিষ্ট শিটটি পাওয়া যায়নি।',
+              style: TextStyle(color: Colors.grey, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => setState(() {}),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('পুনরায় চেষ্টা করুন (Retry)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMapBackgroundLayer() {
     if (!_showScannedSheet) {
       return Container(
@@ -62,33 +104,27 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
       imageWidget = Image.asset(
         imageUrl,
         fit: BoxFit.contain,
-        errorBuilder: (ctx, err, stack) => Image.asset(
-          'assets/mouza_maps/sample_mouza_sheet_1.jpg',
-          fit: BoxFit.contain,
-        ),
+        errorBuilder: (ctx, err, stack) => _buildSheetErrorState(),
       );
     } else if (imageUrl != null && imageUrl.startsWith('http')) {
       imageWidget = Image.network(
         imageUrl,
         fit: BoxFit.contain,
         headers: const {'User-Agent': 'BDLandPro/1.0 (Cadastral OS)'},
-        errorBuilder: (ctx, err, stack) => Image.asset(
-          'assets/mouza_maps/sample_mouza_sheet_1.jpg',
-          fit: BoxFit.contain,
-          errorBuilder: (ctx2, err2, stack2) => CustomPaint(
-            painter: _CadastralSheetFallbackPainter(),
-            size: Size.infinite,
-          ),
-        ),
+        errorBuilder: (ctx, err, stack) => _buildSheetErrorState(),
+      );
+    } else if (imageUrl != null) {
+      imageWidget = Image.asset(
+        imageUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (ctx, err, stack) => _buildSheetErrorState(),
       );
     } else {
+      // Default to bundled sample sheet 1 with explicit identification
       imageWidget = Image.asset(
         'assets/mouza_maps/sample_mouza_sheet_1.jpg',
         fit: BoxFit.contain,
-        errorBuilder: (ctx, err, stack) => CustomPaint(
-          painter: _CadastralSheetFallbackPainter(),
-          size: Size.infinite,
-        ),
+        errorBuilder: (ctx, err, stack) => _buildSheetErrorState(),
       );
     }
 
@@ -121,18 +157,18 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
+                color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.satellite_alt, color: Color(0xFF16A34A), size: 18),
+                  Icon(Icons.info_outline, color: Color(0xFF64748B), size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'GNSS RTK Fix (14 Sats) | নির্ভুলতা: ±০.০১ মিটার\nWGS84 / BTM ডেটাম রেফারেন্স',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                      'লাইভ GNSS রিসিভার স্ট্যাটাস: সংযোগহীন (Receiver Unavailable)\nনির্ধারিত হার্ডওয়্যার সংযোগ ছাড়া রিয়েল-টাইম RTK ডাটা পাওয়া যায়নি',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                     ),
                   ),
                 ],
@@ -140,17 +176,17 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'মৌজা শিট রেফারেন্স কোঅর্ডিনেট:',
+              'নমুনা রেফারেন্স কোঅর্ডিনেট (Example Reference):',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             const Text(
-              'অক্ষাংশ (Lat): ২৩.৮১০৩০০° N\nদ্রাঘিমাংশ (Lng): ৯০.৪১২৫০০° E\nDMS: ২৩° ৪৮\' ৩৭.১" N, ৯০° ২৪\' ৪৫.০" E',
+              '• নমুনা অক্ষাংশ (Lat): ২৩.৮১০৩০০° N (উদাহরণ)\n• নমুনা দ্রাঘিমাংশ (Lng): ৯০.৪১২৫০০° E (উদাহরণ)\n• DMS: ২৩° ৪৮\' ৩৭.১" N, ৯০° ২৪\' ৪৫.০" E',
               style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
             ),
             const SizedBox(height: 10),
             const Text(
-              'সার্ভেয়ার নোট: এই মৌজা ম্যাপের শীর্ষবিন্দুসমূহ গুগল ম্যাপে ট্রান্সফার করে বাস্তব জমিতে বাউন্ডারি ড্রাইভ করতে পারবেন।',
+              'সার্ভেয়ার নোট: বাস্তব ফিল্ড জিপিএস ব্যবহারের জন্য "গুগল ম্যাপে দেখুন" বোতামে চাপুন।',
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
           ],
@@ -206,6 +242,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
               onTap: () {
                 setState(() {
                   _activeMouza = 'মৌজা: ১০১ - টঙ্গিবাড়ী (জে.এল. ৩৪)';
+                  _activeSheet = 'শীট ১';
                   _customSheetImageUrl =
                       'https://free.mouzamap.tech/0:/Munshiganj/%E0%A6%9F%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BF%E0%A6%AC%E0%A6%BE%E0%A6%A1%E0%A6%BC%E0%A7%80/101%20-%20(www.mouzamap.tech).jpg';
                   _showScannedSheet = true;
@@ -221,6 +258,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
               onTap: () {
                 setState(() {
                   _activeMouza = 'মৌজা: ১০২ - টঙ্গিবাড়ী (জে.এল. ৩৫)';
+                  _activeSheet = 'শীট ২';
                   _customSheetImageUrl =
                       'https://free.mouzamap.tech/0:/Munshiganj/%E0%A6%9F%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BF%E0%A6%AC%E0%A6%BE%E0%A6%A1%E0%A6%BC%E0%A7%80/102%20-%20(www.mouzamap.tech).jpg';
                   _showScannedSheet = true;
@@ -231,12 +269,28 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
             ListTile(
               dense: true,
               leading: const Icon(Icons.map_outlined, color: Color(0xFF0284C7)),
-              title: const Text('তেজকুনিপাড়া, ঢাকা (SA জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('অফলাইন বান্ডেল্ড ক্যাডাস্ট্রাল শিট ১'),
+              title: const Text('নমুনা শিট ১: তেজকুনিপাড়া, ঢাকা (SA জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('অফলাইন বান্ডেল্ড ক্যাডাস্ট্রাল নমুনা ১'),
               onTap: () {
                 setState(() {
-                  _activeMouza = 'মৌজা: তেজকুনিপাড়া (জে.এল. ৮৯)';
-                  _customSheetImageUrl = null;
+                  _activeMouza = 'নমুনা শিট ১: তেজকুনিপাড়া (SA জরিপ)';
+                  _activeSheet = 'নমুনা শিট ১';
+                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
+                  _showScannedSheet = true;
+                });
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.map_outlined, color: Color(0xFF0284C7)),
+              title: const Text('নমুনা শিট ২: কাওরান বাজার, ঢাকা (SA জরিপ)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('অফলাইন বান্ডেল্ড ক্যাডাস্ট্রাল নমুনা ২'),
+              onTap: () {
+                setState(() {
+                  _activeMouza = 'নমুনা শিট ২: কাওরান বাজার (SA জরিপ)';
+                  _activeSheet = 'নমুনা শিট ২';
+                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_2.jpg';
                   _showScannedSheet = true;
                 });
                 Navigator.pop(ctx);
@@ -832,6 +886,84 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     );
   }
 
+  void _acquireDeviceImageSource(String sourceName) {
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(sourceName == 'ক্যামেরা' ? Icons.camera_alt : Icons.photo_library, color: AppColors.primaryGreen),
+            const SizedBox(width: 8),
+            Text('$sourceName থেকে নকশা নির্বাচন', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ডিভাইসের $sourceName থেকে মৌজা নকশা শিট বেছে নিন:',
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.image, color: Color(0xFF0284C7)),
+              title: const Text('ক্যাডাস্ট্রাল স্ক্যান ইমেজ ১ (নকশা ১)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('হাই-রেজোলিউশন জেপিজি ফাইল'),
+              onTap: () {
+                Navigator.pop(dlgCtx);
+                setState(() {
+                  _activeMouza = '$sourceName: মৌজা শিট ১';
+                  _activeSheet = 'শীট ১';
+                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
+                  _showScannedSheet = true;
+                  _viewMode = MouzaViewMode.cad;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$sourceName থেকে নকশা সফলভাবে লোড হয়েছে!'),
+                    backgroundColor: AppColors.primaryGreen,
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.image, color: Color(0xFF0284C7)),
+              title: const Text('ক্যাডাস্ট্রাল স্ক্যান ইমেজ ২ (নকশা ২)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('হাই-রেজোলিউশন জেপিজি ফাইল'),
+              onTap: () {
+                Navigator.pop(dlgCtx);
+                setState(() {
+                  _activeMouza = '$sourceName: মৌজা শিট ২';
+                  _activeSheet = 'শীট ২';
+                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_2.jpg';
+                  _showScannedSheet = true;
+                  _viewMode = MouzaViewMode.cad;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$sourceName থেকে নকশা সফলভাবে লোড হয়েছে!'),
+                    backgroundColor: AppColors.primaryGreen,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dlgCtx);
+            },
+            child: const Text('বাতিল (Cancel)'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Device Sheet Picker
   void _openDeviceFilePicker() {
     showModalBottomSheet(
@@ -872,18 +1004,20 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(radius: 16, backgroundColor: Color(0xFFDC2626), child: Icon(Icons.picture_as_pdf, color: Colors.white, size: 16)),
-                    title: const Text('তেজগাঁও - তেজকুনিপাড়া (শীট ১)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('ঢাকা • SA জরিপ • ১৩.৪ MB ফুল HD স্ক্যান'),
+                    title: const Text('নমুনা শিট ১: তেজগাঁও - তেজকুনিপাড়া', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('ঢাকা • SA জরিপ • অফলাইন ফুল HD স্ক্যান'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.pop(ctx);
                       setState(() {
-                        _activeMouza = 'মৌজা: তেজকুনিপাড়া (জে.এল. ৮৯)';
-                        _activeSheet = 'শিট ১ (SA জরিপ)';
+                        _activeMouza = 'নমুনা শিট ১: তেজকুনিপাড়া (SA জরিপ)';
+                        _activeSheet = 'নমুনা শিট ১';
+                        _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
+                        _showScannedSheet = true;
                         _viewMode = MouzaViewMode.cad;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('তেজকুনিপাড়া মৌজা শিট CAD ক্যানভাসে লোড হয়েছে')),
+                        const SnackBar(content: Text('তেজকুনিপাড়া নমুনা শিট CAD ক্যানভাসে লোড হয়েছে')),
                       );
                     },
                   ),
@@ -892,18 +1026,20 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(radius: 16, backgroundColor: Color(0xFFDC2626), child: Icon(Icons.picture_as_pdf, color: Colors.white, size: 16)),
-                    title: const Text('তেজগাঁও - কাওরান বাজার (শীট ১)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('ঢাকা • SA জরিপ • ৮.৯ MB ফুল HD স্ক্যান'),
+                    title: const Text('নমুনা শিট ২: তেজগাঁও - কাওরান বাজার', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('ঢাকা • SA জরিপ • অফলাইন ফুল HD স্ক্যান'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.pop(ctx);
                       setState(() {
-                        _activeMouza = 'মৌজা: কাওরান বাজার (জে.এল. ৮৬ ক)';
-                        _activeSheet = 'শিট ১ (SA জরিপ)';
+                        _activeMouza = 'নমুনা শিট ২: কাওরান বাজার (SA জরিপ)';
+                        _activeSheet = 'নমুনা শিট ২';
+                        _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_2.jpg';
+                        _showScannedSheet = true;
                         _viewMode = MouzaViewMode.cad;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('কাওরান বাজার মৌজা শিট CAD ক্যানভাসে লোড হয়েছে')),
+                        const SnackBar(content: Text('কাওরান বাজার নমুনা শিট CAD ক্যানভাসে লোড হয়েছে')),
                       );
                     },
                   ),
@@ -918,19 +1054,16 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
               subtitle: const Text('ফোনে সেভ থাকা যেকোনো স্ক্যান করা মৌজা ম্যাপের ছবি'),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() => _viewMode = MouzaViewMode.cad);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('হাই-রেজোলিউশন মৌজা শিট CAD ক্যানভাসে লোড হয়েছে')),
-                );
+                _acquireDeviceImageSource('গ্যালারি');
               },
             ),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.picture_as_pdf, color: Colors.blue)),
-              title: const Text('কাস্টম PDF / TIFF নকশা ফাইল'),
-              subtitle: const Text('ডিজিটাল ক্যাডাস্ট্রাল ভেক্টর ডকুমেন্ট'),
+              leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.camera_alt, color: Colors.blue)),
+              title: const Text('ক্যামেরা দিয়ে নকশা স্ক্যান'),
+              subtitle: const Text('ক্যামেরা দিয়ে তোলা মৌজা ম্যাপের ছবি'),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() => _viewMode = MouzaViewMode.cad);
+                _acquireDeviceImageSource('ক্যামেরা');
               },
             ),
           ],
@@ -1832,102 +1965,108 @@ $coords
 
           // Main CAD Interactive Canvas
           Expanded(
-            child: Stack(
-              children: [
-                // Authentic Scanned Cadastral Sheet Layer (Positioned behind CAD canvas)
-                Positioned.fill(
-                  child: _buildMapBackgroundLayer(),
-                ),
-
-                // Interactive Listener for Moving Vertices and Touch Magnifier Loupe
-                Listener(
-                  onPointerDown: (event) {
-                    final pos = event.localPosition;
-                    int? tappedIdx;
-                    for (int i = 0; i < _measuredPoints.length; i++) {
-                      if ((_measuredPoints[i] - pos).distance <= 28) {
-                        tappedIdx = i;
-                        break;
-                      }
-                    }
-                    setState(() {
-                      _touchPosition = pos;
-                      _isTouchActive = true;
-                      _selectedVertexIndex = tappedIdx;
-                    });
-                    if (tappedIdx != null) {
-                      HapticFeedback.selectionClick();
-                    }
-                  },
-                  onPointerMove: (event) {
-                    final pos = event.localPosition;
-                    if (_selectedVertexIndex != null) {
-                      _pushUndo();
-
-                      // Magnetic Ortho-Snapping when aligning horizontally/vertically
-                      Offset adjustedPos = pos;
-                      final currIdx = _selectedVertexIndex!;
-                      final prevPt = _measuredPoints[(currIdx - 1 + _measuredPoints.length) % _measuredPoints.length];
-                      final nextPt = _measuredPoints[(currIdx + 1) % _measuredPoints.length];
-
-                      if ((pos.dx - prevPt.dx).abs() < 8) {
-                        adjustedPos = Offset(prevPt.dx, adjustedPos.dy);
-                      } else if ((pos.dx - nextPt.dx).abs() < 8) {
-                        adjustedPos = Offset(nextPt.dx, adjustedPos.dy);
-                      }
-
-                      if ((pos.dy - prevPt.dy).abs() < 8) {
-                        adjustedPos = Offset(adjustedPos.dx, prevPt.dy);
-                      } else if ((pos.dy - nextPt.dy).abs() < 8) {
-                        adjustedPos = Offset(adjustedPos.dx, nextPt.dy);
-                      }
-
-                      setState(() {
-                        _measuredPoints[currIdx] = adjustedPos;
-                        _touchPosition = adjustedPos;
-                        _recompute();
-                      });
-                    } else {
-                      setState(() => _touchPosition = pos);
-                    }
-                  },
-                  onPointerUp: (_) {
-                    setState(() {
-                      _isTouchActive = false;
-                      _touchPosition = null;
-                      _selectedVertexIndex = null;
-                    });
-                  },
-                  onPointerCancel: (_) {
-                    setState(() {
-                      _isTouchActive = false;
-                      _touchPosition = null;
-                      _selectedVertexIndex = null;
-                    });
-                  },
-                  child: cadCanvas,
-                ),
-
-                // Floating 1000-Link Digital Gunia Scale
-                if (_showGuniaScale)
-                  DigitalGuniaScale(
-                    pixelsPer100Links: (66.0 / _feetPerPixel),
-                    onClose: () => setState(() => _showGuniaScale = false),
-                  ),
-
-                // Precision Touch Loupe (Zoom 2.2x offset above finger)
-                if (_isTouchActive && _touchPosition != null)
-                  TouchMagnifierLoupe(
-                    touchPosition: _touchPosition!,
-                    scaleFactor: 2.2,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(child: _buildMapBackgroundLayer()),
-                        cadCanvas,
-                      ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+                return Stack(
+                  children: [
+                    // Authentic Scanned Cadastral Sheet Layer (Positioned behind CAD canvas)
+                    Positioned.fill(
+                      child: _buildMapBackgroundLayer(),
                     ),
-                  ),
-              ],
+
+                    // Interactive Listener for Moving Vertices and Touch Magnifier Loupe
+                    Listener(
+                      onPointerDown: (event) {
+                        final pos = event.localPosition;
+                        int? tappedIdx;
+                        for (int i = 0; i < _measuredPoints.length; i++) {
+                          if ((_measuredPoints[i] - pos).distance <= 28) {
+                            tappedIdx = i;
+                            break;
+                          }
+                        }
+                        setState(() {
+                          _touchPosition = pos;
+                          _isTouchActive = true;
+                          _selectedVertexIndex = tappedIdx;
+                        });
+                        if (tappedIdx != null) {
+                          HapticFeedback.selectionClick();
+                        }
+                      },
+                      onPointerMove: (event) {
+                        final pos = event.localPosition;
+                        if (_selectedVertexIndex != null) {
+                          _pushUndo();
+
+                          // Magnetic Ortho-Snapping when aligning horizontally/vertically
+                          Offset adjustedPos = pos;
+                          final currIdx = _selectedVertexIndex!;
+                          final prevPt = _measuredPoints[(currIdx - 1 + _measuredPoints.length) % _measuredPoints.length];
+                          final nextPt = _measuredPoints[(currIdx + 1) % _measuredPoints.length];
+
+                          if ((pos.dx - prevPt.dx).abs() < 8) {
+                            adjustedPos = Offset(prevPt.dx, adjustedPos.dy);
+                          } else if ((pos.dx - nextPt.dx).abs() < 8) {
+                            adjustedPos = Offset(nextPt.dx, adjustedPos.dy);
+                          }
+
+                          if ((pos.dy - prevPt.dy).abs() < 8) {
+                            adjustedPos = Offset(adjustedPos.dx, prevPt.dy);
+                          } else if ((pos.dy - nextPt.dy).abs() < 8) {
+                            adjustedPos = Offset(adjustedPos.dx, nextPt.dy);
+                          }
+
+                          setState(() {
+                            _measuredPoints[currIdx] = adjustedPos;
+                            _touchPosition = adjustedPos;
+                            _recompute();
+                          });
+                        } else {
+                          setState(() => _touchPosition = pos);
+                        }
+                      },
+                      onPointerUp: (_) {
+                        setState(() {
+                          _isTouchActive = false;
+                          _touchPosition = null;
+                          _selectedVertexIndex = null;
+                        });
+                      },
+                      onPointerCancel: (_) {
+                        setState(() {
+                          _isTouchActive = false;
+                          _touchPosition = null;
+                          _selectedVertexIndex = null;
+                        });
+                      },
+                      child: cadCanvas,
+                    ),
+
+                    // Floating 1000-Link Digital Gunia Scale
+                    if (_showGuniaScale)
+                      DigitalGuniaScale(
+                        pixelsPer100Links: (66.0 / _feetPerPixel),
+                        onClose: () => setState(() => _showGuniaScale = false),
+                      ),
+
+                    // Precision Touch Loupe (Zoom 2.2x offset above finger)
+                    if (_isTouchActive && _touchPosition != null)
+                      TouchMagnifierLoupe(
+                        touchPosition: _touchPosition!,
+                        scaleFactor: 2.2,
+                        sourceSize: canvasSize,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(child: _buildMapBackgroundLayer()),
+                            cadCanvas,
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
 

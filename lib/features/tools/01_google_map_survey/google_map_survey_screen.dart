@@ -181,7 +181,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             onPressed: () {
               final lat = double.tryParse(latCtrl.text.trim());
               final lng = double.tryParse(lngCtrl.text.trim());
-              if (lat == null || lng == null || lat < 20.0 || lat > 27.0 || lng < 88.0 || lng > 93.0) {
+              if (lat == null || lng == null || !lat.isFinite || !lng.isFinite || lat < 20.0 || lat > 27.0 || lng < 88.0 || lng > 93.0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('সঠিক বাংলাদেশি জিপিএস কোঅর্ডিনেট দিন (Lat: 20°-27°, Lng: 88°-93°)'),
@@ -260,15 +260,23 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             onPressed: () {
               final lat = double.tryParse(latCtrl.text.trim());
               final lng = double.tryParse(lngCtrl.text.trim());
-              if (lat != null && lng != null) {
-                setState(() {
-                  _surveyPoints[index] = LatLngPoint(lat, lng);
-                  _recompute();
-                });
-                _mapController.jumpTo(lat, lng, zoom: 18.0);
-                Navigator.pop(ctx);
-                onEdited();
+              if (lat == null || lng == null || !lat.isFinite || !lng.isFinite || lat < -90.0 || lat > 90.0 || lng < -180.0 || lng > 180.0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('সঠিক WGS84 কোঅর্ডিনেট দিন (Lat: -90° হতে 90°, Lng: -180° হতে 180°)'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
               }
+
+              setState(() {
+                _surveyPoints[index] = LatLngPoint(lat, lng);
+                _recompute();
+              });
+              _mapController.jumpTo(lat, lng, zoom: 18.0);
+              Navigator.pop(ctx);
+              onEdited();
             },
             child: const Text('সংরক্ষণ'),
           ),

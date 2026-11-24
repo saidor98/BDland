@@ -5,12 +5,14 @@ import '../../../core/constants/bangla_numerals.dart';
 class TouchMagnifierLoupe extends StatelessWidget {
   final Offset touchPosition;
   final double scaleFactor;
+  final Size? sourceSize;
   final Widget child;
 
   const TouchMagnifierLoupe({
     super.key,
     required this.touchPosition,
     this.scaleFactor = 2.0,
+    this.sourceSize,
     required this.child,
   });
 
@@ -21,6 +23,14 @@ class TouchMagnifierLoupe extends StatelessWidget {
 
     final loupeLeft = touchPosition.dx - (loupeSize / 2);
     final loupeTop = touchPosition.dy - verticalOffset - (loupeSize / 2);
+
+    final content = sourceSize != null
+        ? SizedBox(
+            width: sourceSize!.width,
+            height: sourceSize!.height,
+            child: child,
+          )
+        : child;
 
     return Positioned(
       left: loupeLeft.clamp(10.0, MediaQuery.of(context).size.width - loupeSize - 10),
@@ -52,7 +62,7 @@ class TouchMagnifierLoupe extends StatelessWidget {
                   child: Transform.scale(
                     scale: scaleFactor,
                     alignment: Alignment.topLeft,
-                    child: child,
+                    child: content,
                   ),
                 ),
 

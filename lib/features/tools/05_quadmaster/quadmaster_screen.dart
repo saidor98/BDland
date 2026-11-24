@@ -34,18 +34,30 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
 
   final List<Map<String, String>> _undoStack = [];
   final List<Map<String, String>> _redoStack = [];
+  Map<String, String>? _lastMeasurementState;
 
-  void _pushUndoState() {
-    _undoStack.add({
+  Map<String, String> _getCurrentState() {
+    return {
       'n': _northCtrl.text,
       's': _southCtrl.text,
       'e': _eastCtrl.text,
       'w': _westCtrl.text,
       'dx': _diagXCtrl.text,
       'dy': _diagYCtrl.text,
-    });
+    };
+  }
+
+  void _pushUndoState() {
+    final stateToSave = _lastMeasurementState ?? _getCurrentState();
+    _undoStack.add(Map<String, String>.from(stateToSave));
     if (_undoStack.length > 20) _undoStack.removeAt(0);
     _redoStack.clear();
+  }
+
+  void _onInputChanged() {
+    _pushUndoState();
+    _lastMeasurementState = _getCurrentState();
+    _calculate();
   }
 
   void _undo() {
@@ -55,14 +67,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
       );
       return;
     }
-    _redoStack.add({
-      'n': _northCtrl.text,
-      's': _southCtrl.text,
-      'e': _eastCtrl.text,
-      'w': _westCtrl.text,
-      'dx': _diagXCtrl.text,
-      'dy': _diagYCtrl.text,
-    });
+    _redoStack.add(_getCurrentState());
     final prev = _undoStack.removeLast();
     _northCtrl.text = prev['n']!;
     _southCtrl.text = prev['s']!;
@@ -70,6 +75,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     _westCtrl.text = prev['w']!;
     _diagXCtrl.text = prev['dx']!;
     _diagYCtrl.text = prev['dy']!;
+    _lastMeasurementState = _getCurrentState();
     _calculate();
     setState(() {});
   }
@@ -81,14 +87,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
       );
       return;
     }
-    _undoStack.add({
-      'n': _northCtrl.text,
-      's': _southCtrl.text,
-      'e': _eastCtrl.text,
-      'w': _westCtrl.text,
-      'dx': _diagXCtrl.text,
-      'dy': _diagYCtrl.text,
-    });
+    _undoStack.add(_getCurrentState());
     final next = _redoStack.removeLast();
     _northCtrl.text = next['n']!;
     _southCtrl.text = next['s']!;
@@ -96,6 +95,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     _westCtrl.text = next['w']!;
     _diagXCtrl.text = next['dx']!;
     _diagYCtrl.text = next['dy']!;
+    _lastMeasurementState = _getCurrentState();
     _calculate();
     setState(() {});
   }
@@ -192,6 +192,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
   @override
   void initState() {
     super.initState();
+    _lastMeasurementState = _getCurrentState();
     _calculate();
   }
 
@@ -657,7 +658,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
         isDense: true,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
-      onChanged: (_) => _calculate(),
+      onChanged: (_) => _onInputChanged(),
     );
   }
 }
