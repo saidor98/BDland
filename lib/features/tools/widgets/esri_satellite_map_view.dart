@@ -44,6 +44,10 @@ class EsriMapController {
   void setLayer(SatelliteLayerType layer) => _state?.setLayer(layer);
   SatelliteLayerType get activeLayer => _state?.activeLayer ?? SatelliteLayerType.esriSatellite;
   double get currentZoom => _state?.currentZoom ?? 17.0;
+  LatLngPoint get currentCenter => _state?.currentCenter ?? const LatLngPoint(23.8103, 90.4125);
+  int? get selectedVertexIndex => _state?.selectedVertexIndex;
+  void selectVertex(int? index) => _state?.selectVertex(index);
+  void nudgeSelected(double dLatFeet, double dLngFeet) => _state?.nudgeSelectedVertex(dLatFeet, dLngFeet);
   void showLayerDialog(BuildContext context) => _state?.showLayerSelectorDialog();
   void showJumpDialog(BuildContext context) => _state?.showLocationJumpDialog();
 }
@@ -64,6 +68,10 @@ class EsriSatelliteMapView extends StatefulWidget {
   final bool showZoomButtons;
   final bool showLayerSwitcher;
   final bool showLocationJump;
+  final bool showCenterReticle;
+  final bool showNudgeDpad;
+  final List<LatLngPoint>? partitionSplitLine;
+  final ValueChanged<int?>? onVertexSelected;
 
   const EsriSatelliteMapView({
     super.key,
@@ -82,6 +90,10 @@ class EsriSatelliteMapView extends StatefulWidget {
     this.showZoomButtons = true,
     this.showLayerSwitcher = true,
     this.showLocationJump = true,
+    this.showCenterReticle = false,
+    this.showNudgeDpad = false,
+    this.partitionSplitLine,
+    this.onVertexSelected,
   });
 
   @override
@@ -169,9 +181,14 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
   late SatelliteLayerType _activeLayer;
 
   int? _draggedVertexIndex;
+  int? _selectedVertexIndex;
+  double _nudgeStepFeet = 0.5;
+  double _baseZoom = 17.0;
 
   SatelliteLayerType get activeLayer => _activeLayer;
   double get currentZoom => _zoom;
+  LatLngPoint get currentCenter => LatLngPoint(_centerLat, _centerLng);
+  int? get selectedVertexIndex => _selectedVertexIndex;
 
   @override
   void initState() {
@@ -200,13 +217,13 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
 
   void zoomIn() {
     setState(() {
-      _zoom = (_zoom + 0.5).clamp(10.0, 20.0);
+      _zoom = (_zoom + 0.5).clamp(10.0, 21.0);
     });
   }
 
   void zoomOut() {
     setState(() {
-      _zoom = (_zoom - 0.5).clamp(10.0, 20.0);
+      _zoom = (_zoom - 0.5).clamp(10.0, 21.0);
     });
   }
 
@@ -214,7 +231,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     setState(() {
       _centerLat = lat;
       _centerLng = lng;
-      _zoom = zoom;
+      _zoom = zoom.clamp(10.0, 21.0);
     });
   }
 
@@ -224,12 +241,34 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     });
   }
 
+  void selectVertex(int? index) {
+    setState(() {
+      _selectedVertexIndex = index;
+    });
+    widget.onVertexSelected?.call(index);
+  }
+
+  void nudgeSelectedVertex(double dLatFeet, double dLngFeet) {
+    if (_selectedVertexIndex == null || _selectedVertexIndex! >= widget.surveyPoints.length) return;
+    const rFeet = 20902231.0;
+    final p = widget.surveyPoints[_selectedVertexIndex!] ;
+    final dLat = (dLatFeet / rFeet) * (180.0 / math.pi);
+    final cosLat = math.cos(p.latitude * math.pi / 180.0);
+    final dLng = (dLngFeet / (rFeet * (cosLat.abs() > 0.0001 ? cosLat : 1.0))) * (180.0 / math.pi);
+
+    final updated = LatLngPoint(p.latitude + dLat, p.longitude + dLng);
+    final list = List<LatLngPoint>.from(widget.surveyPoints);
+    list[_selectedVertexIndex!] = updated;
+    widget.onPointsChanged?.call(list);
+    setState(() {});
+  }
+
   String _getTileUrl(int z, int x, int y) {
     switch (_activeLayer) {
       case SatelliteLayerType.mapboxSatelliteStreets:
-        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, z, x, y);
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, z, x, y, highDpi: true);
       case SatelliteLayerType.mapboxSatellitePure:
-        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatellitePureStyle, z, x, y);
+        return MapConfig.getMapboxTileUrl(MapConfig.mapboxSatellitePureStyle, z, x, y, highDpi: true);
       case SatelliteLayerType.mapboxStreets:
         return MapConfig.getMapboxTileUrl(MapConfig.mapboxStreetsStyle, z, x, y);
       case SatelliteLayerType.mapboxOutdoors:
@@ -277,18 +316,41 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     return EsriSatelliteMapView.worldPixelsToLatLng(ptWorldX, ptWorldY, _zoom);
   }
 
-  void _onPanUpdate(DragUpdateDetails details, Size size) {
-    if (_draggedVertexIndex != null) {
-      // Moving a survey point
-      final updatedPoint = _screenToLatLng(details.localPosition, size);
+  void _onScaleStart(ScaleStartDetails details, Size size) {
+    _baseZoom = _zoom;
+    final pos = details.localFocalPoint;
+    final screenPoints = widget.surveyPoints.map((p) => _latLngToScreen(p, size)).toList();
+    _draggedVertexIndex = null;
+    for (int i = 0; i < screenPoints.length; i++) {
+      if ((screenPoints[i] - pos).distance < 28.0) {
+        setState(() {
+          _draggedVertexIndex = i;
+          _selectedVertexIndex = i;
+        });
+        widget.onVertexSelected?.call(i);
+        return;
+      }
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details, Size size) {
+    if (details.pointerCount >= 2) {
+      // Multi-touch pinch-to-zoom
+      setState(() {
+        final zoomDelta = math.log(details.scale) / math.ln2;
+        _zoom = (_baseZoom + zoomDelta).clamp(10.0, 21.0);
+      });
+    } else if (_draggedVertexIndex != null) {
+      // Dragging a survey vertex
+      final updatedPoint = _screenToLatLng(details.localFocalPoint, size);
       final list = List<LatLngPoint>.from(widget.surveyPoints);
       list[_draggedVertexIndex!] = updatedPoint;
       widget.onPointsChanged?.call(list);
     } else {
-      // Panning the satellite map
+      // Panning the satellite map with 1 finger
       final centerWorld = EsriSatelliteMapView.latLngToWorldPixels(_centerLat, _centerLng, _zoom);
-      final newCenterX = centerWorld.dx - details.delta.dx;
-      final newCenterY = centerWorld.dy - details.delta.dy;
+      final newCenterX = centerWorld.dx - details.focalPointDelta.dx;
+      final newCenterY = centerWorld.dy - details.focalPointDelta.dy;
       final newCenter = EsriSatelliteMapView.worldPixelsToLatLng(newCenterX, newCenterY, _zoom);
       setState(() {
         _centerLat = newCenter.latitude;
@@ -297,14 +359,43 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     }
   }
 
-  void _onTapUp(TapUpDetails details, Size size) {
-    if (!widget.isDrawingMode) return;
-    if (_draggedVertexIndex != null) return;
+  void _onScaleEnd(ScaleEndDetails details) {
+    setState(() {
+      _draggedVertexIndex = null;
+    });
+  }
 
-    final clickedPt = _screenToLatLng(details.localPosition, size);
-    final list = List<LatLngPoint>.from(widget.surveyPoints);
-    list.add(clickedPt);
-    widget.onPointsChanged?.call(list);
+  void _onTapUp(TapUpDetails details, Size size) {
+    final pos = details.localPosition;
+    final screenPoints = widget.surveyPoints.map((p) => _latLngToScreen(p, size)).toList();
+
+    // Check if tapped on existing vertex
+    for (int i = 0; i < screenPoints.length; i++) {
+      if ((screenPoints[i] - pos).distance < 28.0) {
+        setState(() {
+          _selectedVertexIndex = (_selectedVertexIndex == i ? null : i);
+        });
+        widget.onVertexSelected?.call(_selectedVertexIndex);
+        return;
+      }
+    }
+
+    // Tapped on empty map space
+    if (widget.isDrawingMode) {
+      final clickedPt = _screenToLatLng(pos, size);
+      final list = List<LatLngPoint>.from(widget.surveyPoints);
+      list.add(clickedPt);
+      setState(() {
+        _selectedVertexIndex = list.length - 1;
+      });
+      widget.onPointsChanged?.call(list);
+      widget.onVertexSelected?.call(_selectedVertexIndex);
+    } else {
+      setState(() {
+        _selectedVertexIndex = null;
+      });
+      widget.onVertexSelected?.call(null);
+    }
   }
 
   void showLocationJumpDialog() {
@@ -495,22 +586,19 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
         // Convert survey points to screen coordinates
         final screenPoints = widget.surveyPoints.map((p) => _latLngToScreen(p, size)).toList();
 
+        // Convert partition line to screen coordinates if present
+        final partitionScreenPoints = widget.partitionSplitLine != null
+            ? widget.partitionSplitLine!.map((p) => _latLngToScreen(p, size)).toList()
+            : null;
+
         return Stack(
           children: [
             // 1. Interactive Satellite Map Tile Grid
             GestureDetector(
               onTapUp: (details) => _onTapUp(details, size),
-              onPanStart: (details) {
-                final pos = details.localPosition;
-                for (int i = 0; i < screenPoints.length; i++) {
-                  if ((screenPoints[i] - pos).distance < 28.0) {
-                    setState(() => _draggedVertexIndex = i);
-                    return;
-                  }
-                }
-              },
-              onPanUpdate: (details) => _onPanUpdate(details, size),
-              onPanEnd: (_) => setState(() => _draggedVertexIndex = null),
+              onScaleStart: (details) => _onScaleStart(details, size),
+              onScaleUpdate: (details) => _onScaleUpdate(details, size),
+              onScaleEnd: (details) => _onScaleEnd(details),
               child: Stack(
                 children: [
                   // Base Tile Layer
@@ -526,13 +614,135 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                       points: widget.surveyPoints,
                       screenPoints: screenPoints,
                       draggedIndex: _draggedVertexIndex,
+                      selectedIndex: _selectedVertexIndex,
                       showDimensions: widget.showDimensions,
                       showAngles: widget.showAngles,
+                      partitionScreenPoints: partitionScreenPoints,
                     ),
                   ),
                 ],
               ),
             ),
+
+            // 1.1 Surveyor's Center Reticle / Crosshair Target
+            if (widget.showCenterReticle)
+              IgnorePointer(
+                child: Center(
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: CustomPaint(
+                      painter: _CenterReticlePainter(),
+                    ),
+                  ),
+                ),
+              ),
+
+            // 1.2 Selected Vertex Precision Micro-Nudge D-Pad
+            if (widget.showNudgeDpad && _selectedVertexIndex != null && _selectedVertexIndex! < widget.surveyPoints.length)
+              Positioned(
+                bottom: 16,
+                left: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xF20F172A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF0284C7), width: 1.5),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'পয়েন্ট ${BanglaNumerals.toBangla(_selectedVertexIndex! + 1)} মাইক্রো-নাজ',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => setState(() {
+                              if (_nudgeStepFeet == 0.1) {
+                                _nudgeStepFeet = 0.5;
+                              } else if (_nudgeStepFeet == 0.5) {
+                                _nudgeStepFeet = 1.0;
+                              } else {
+                                _nudgeStepFeet = 0.1;
+                              }
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0369A1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${_nudgeStepFeet.toStringAsFixed(1)} ft',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () => selectVertex(null),
+                            child: const Icon(Icons.close, color: Colors.white70, size: 16),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Directional Pad
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton.filledTonal(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () => nudgeSelectedVertex(_nudgeStepFeet, 0),
+                            icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+                            tooltip: 'উত্তর (+)',
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton.filledTonal(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () => nudgeSelectedVertex(0, -_nudgeStepFeet),
+                            icon: const Icon(Icons.keyboard_arrow_left, size: 20),
+                            tooltip: 'পশ্চিম (-)',
+                          ),
+                          const SizedBox(width: 32),
+                          IconButton.filledTonal(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () => nudgeSelectedVertex(0, _nudgeStepFeet),
+                            icon: const Icon(Icons.keyboard_arrow_right, size: 20),
+                            tooltip: 'পূর্ব (+)',
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton.filledTonal(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () => nudgeSelectedVertex(-_nudgeStepFeet, 0),
+                            icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                            tooltip: 'দক্ষিণ (-)',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // 2. Top-Left: Active Satellite Layer Tag
             if (widget.showControls && widget.showLayerTag)
@@ -848,15 +1058,19 @@ class _SatelliteCadastralPainter extends CustomPainter {
   final List<LatLngPoint> points;
   final List<Offset> screenPoints;
   final int? draggedIndex;
+  final int? selectedIndex;
   final bool showDimensions;
   final bool showAngles;
+  final List<Offset>? partitionScreenPoints;
 
   _SatelliteCadastralPainter({
     required this.points,
     required this.screenPoints,
     required this.draggedIndex,
+    this.selectedIndex,
     required this.showDimensions,
     required this.showAngles,
+    this.partitionScreenPoints,
   });
 
   @override
@@ -883,7 +1097,22 @@ class _SatelliteCadastralPainter extends CustomPainter {
     }
     canvas.drawPath(path, polyStroke);
 
-    // 2. Side length badges in real Haversine feet
+    // 1.1 Draw partition line if present
+    if (partitionScreenPoints != null && partitionScreenPoints!.length >= 2) {
+      final partPaint = Paint()
+        ..color = const Color(0xFFF59E0B)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+
+      final p1 = partitionScreenPoints![0];
+      final p2 = partitionScreenPoints![1];
+      canvas.drawLine(p1, p2, partPaint);
+
+      final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+      _drawAngleBadge(canvas, 'বণ্টন রেখা', mid);
+    }
+
+    // 2. Side length badges in real Haversine feet and links
     if (showDimensions && points.length >= 2) {
       for (int i = 0; i < points.length; i++) {
         final p1 = points[i];
@@ -895,7 +1124,12 @@ class _SatelliteCadastralPainter extends CustomPainter {
         final mid = Offset((sp1.dx + sp2.dx) / 2.0, (sp1.dy + sp2.dy) / 2.0);
 
         final distFeet = EsriSatelliteMapView.haversineFeet(p1, p2);
-        _drawPillLabel(canvas, '${BanglaFormatter.formatNumber(distFeet, fractionDigits: 1)} ft', mid);
+        final distLinks = distFeet / 0.66;
+        _drawPillLabel(
+          canvas,
+          '${BanglaFormatter.formatNumber(distFeet, fractionDigits: 1)} ft (${BanglaFormatter.formatNumber(distLinks, fractionDigits: 0)} link)',
+          mid,
+        );
       }
     }
 
@@ -927,27 +1161,40 @@ class _SatelliteCadastralPainter extends CustomPainter {
       }
     }
 
-    // 4. Draw Cadastral Vertex Pins (draggable)
+    // 4. Draw Cadastral Vertex Pins (draggable and selectable)
     for (int i = 0; i < screenPoints.length; i++) {
       final sp = screenPoints[i];
       final isDragged = draggedIndex == i;
+      final isSelected = selectedIndex == i;
+
+      // Selection halo
+      if (isSelected) {
+        canvas.drawCircle(
+          sp,
+          16.0,
+          Paint()
+            ..color = const Color(0xFF10B981)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.4,
+        );
+      }
 
       // Glow halo
       canvas.drawCircle(
         sp,
-        isDragged ? 12.0 : 8.0,
-        Paint()..color = isDragged ? const Color(0x66FFC107) : const Color(0x660284C7),
+        isDragged ? 13.0 : 9.0,
+        Paint()..color = isDragged ? const Color(0x66FFC107) : (isSelected ? const Color(0x6610B981) : const Color(0x660284C7)),
       );
 
       // Core pin
       canvas.drawCircle(
         sp,
-        isDragged ? 8.0 : 6.0,
-        Paint()..color = isDragged ? Colors.amber : Colors.yellowAccent,
+        isDragged ? 8.5 : 6.5,
+        Paint()..color = isDragged ? Colors.amber : (isSelected ? const Color(0xFF10B981) : Colors.yellowAccent),
       );
       canvas.drawCircle(
         sp,
-        isDragged ? 8.0 : 6.0,
+        isDragged ? 8.5 : 6.5,
         Paint()
           ..color = Colors.black87
           ..style = PaintingStyle.stroke
@@ -958,7 +1205,11 @@ class _SatelliteCadastralPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: BanglaNumerals.toBangla(i + 1),
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : Colors.black87,
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -1004,4 +1255,41 @@ class _SatelliteCadastralPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SatelliteCadastralPainter oldDelegate) => true;
+}
+
+class _CenterReticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2.0;
+    final cy = size.height / 2.0;
+
+    final ringPaint = Paint()
+      ..color = const Color(0xCC0284C7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final hairPaint = Paint()
+      ..color = const Color(0xFF38BDF8)
+      ..strokeWidth = 1.3;
+
+    final dotPaint = Paint()
+      ..color = const Color(0xFFEF4444)
+      ..style = PaintingStyle.fill;
+
+    // Outer target ring
+    canvas.drawCircle(Offset(cx, cy), 16.0, ringPaint);
+    canvas.drawCircle(Offset(cx, cy), 6.0, ringPaint);
+
+    // Crosshairs
+    canvas.drawLine(Offset(cx - 22, cy), Offset(cx - 8, cy), hairPaint);
+    canvas.drawLine(Offset(cx + 8, cy), Offset(cx + 22, cy), hairPaint);
+    canvas.drawLine(Offset(cx, cy - 22), Offset(cx, cy - 8), hairPaint);
+    canvas.drawLine(Offset(cx, cy + 8), Offset(cx, cy + 22), hairPaint);
+
+    // Center laser dot
+    canvas.drawCircle(Offset(cx, cy), 2.5, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

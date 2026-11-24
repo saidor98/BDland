@@ -30,10 +30,11 @@ class MapConfig {
   // OpenStreetMap Endpoint
   static const String osmBase = 'https://tile.openstreetmap.org';
 
-  /// Generates a Mapbox Slippy Tile URL (256x256 standard tile)
-  static String getMapboxTileUrl(String styleId, int z, int x, int y) {
+  /// Generates a Mapbox Slippy Tile URL (256x256 standard tile or @2x Retina tile)
+  static String getMapboxTileUrl(String styleId, int z, int x, int y, {bool highDpi = false}) {
     final token = mapboxAccessToken;
-    return 'https://api.mapbox.com/styles/v1/$styleId/tiles/256/$z/$x/$y?access_token=$token';
+    final suffix = highDpi ? '@2x' : '';
+    return 'https://api.mapbox.com/styles/v1/$styleId/tiles/256/$z/$x/$y$suffix?access_token=$token';
   }
 
   /// Generates an ESRI Slippy Tile URL

@@ -16,6 +16,9 @@ void main() {
       expect(tileUrl, contains('satellite-streets-v12'));
       expect(tileUrl, contains(MapConfig.mapboxAccessToken));
 
+      final retinaTileUrl = MapConfig.getMapboxTileUrl(MapConfig.mapboxSatelliteStreetsStyle, 14, 12306, 7104, highDpi: true);
+      expect(retinaTileUrl, contains('/tiles/256/14/12306/7104@2x?access_token='));
+
       final esriUrl = MapConfig.getEsriTileUrl(MapConfig.esriWorldImageryBase, 17, 98455, 56838);
       expect(esriUrl, contains('arcgisonline.com'));
       expect(esriUrl, contains('World_Imagery'));
@@ -181,6 +184,9 @@ void main() {
       final controller = EsriMapController();
       expect(controller.activeLayer, equals(SatelliteLayerType.esriSatellite));
       expect(controller.currentZoom, equals(17.0));
+      expect(controller.currentCenter.latitude, closeTo(23.81, 0.05));
+      expect(controller.currentCenter.longitude, closeTo(90.41, 0.05));
+      expect(controller.selectedVertexIndex, isNull);
     });
   });
 }

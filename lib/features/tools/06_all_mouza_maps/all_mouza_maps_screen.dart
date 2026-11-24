@@ -239,30 +239,36 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
   void _openCadastralViewerFromCloud(MouzaCloudItem file) {
     // Extract sheet and mouza name from file title
     final cleanName = file.name
+        .replaceAll(' - (www.mouzamap.tech).jpg', '')
         .replaceAll(' - (www.mouzamap.tech).pdf', '')
+        .replaceAll('.jpg', '')
         .replaceAll('.pdf', '')
         .replaceAll('_result_result', '');
 
-    final dummyItem = MouzaDirectoryItem(
+    final pathParts = _currentPath.split('/');
+    final district = pathParts.isNotEmpty && pathParts[0].isNotEmpty ? pathParts[0] : 'ঢাকা';
+    final upazila = pathParts.length > 1 && pathParts[1].isNotEmpty ? pathParts[1] : 'সদর';
+
+    final item = MouzaDirectoryItem(
       division: _currentDivisionName,
-      district: _currentPath.split('/').isNotEmpty ? _currentPath.split('/')[0] : 'ঢাকা',
-      upazila: _currentPath.split('/').length > 1 ? _currentPath.split('/')[1] : 'সদর',
+      district: district,
+      upazila: upazila,
       mouzaName: cleanName,
       jlNo: '৩৪',
-      surveyType: _currentPath.contains('RS') ? 'RS' : 'CS / RS',
+      surveyType: _currentPath.contains('RS') ? 'RS' : (_currentPath.contains('CS') ? 'CS' : 'CS / RS'),
       totalSheets: 3,
       totalPlots: 850,
     );
 
-    _openCadastralViewer(dummyItem);
+    _openCadastralViewer(item, cloudItem: file);
   }
 
-  void _openCadastralViewer(MouzaDirectoryItem item) {
+  void _openCadastralViewer(MouzaDirectoryItem item, {MouzaCloudItem? cloudItem}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _CadastralSheetModal(item: item),
+      builder: (ctx) => _CadastralSheetModal(item: item, cloudItem: cloudItem),
     );
   }
 
@@ -397,7 +403,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                           Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F5A38).withOpacity(0.3),
+                              color: const Color(0x4D0F5A38),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(Icons.offline_pin, color: Color(0xFF4ADE80), size: 18),
@@ -539,7 +545,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                           boxShadow: isSel
                               ? [
                                   BoxShadow(
-                                    color: const Color(0xFF8B5CF6).withOpacity(0.35),
+                                    color: const Color(0x598B5CF6),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   )
@@ -681,8 +687,8 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                                   height: 40,
                                   decoration: BoxDecoration(
                                     color: item.isFolder
-                                        ? const Color(0xFF6B21A8).withOpacity(0.3)
-                                        : const Color(0xFFDC2626).withOpacity(0.2),
+                                        ? const Color(0x4D6B21A8)
+                                        : const Color(0x33DC2626),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
@@ -805,8 +811,12 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
 
 class _CadastralSheetModal extends StatefulWidget {
   final MouzaDirectoryItem item;
+  final MouzaCloudItem? cloudItem;
 
-  const _CadastralSheetModal({required this.item});
+  const _CadastralSheetModal({
+    required this.item,
+    this.cloudItem,
+  });
 
   @override
   State<_CadastralSheetModal> createState() => _CadastralSheetModalState();
@@ -814,7 +824,19 @@ class _CadastralSheetModal extends StatefulWidget {
 
 class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   int _selectedSheetIndex = 1;
+  late bool _showAuthenticScan;
   bool _showGunia = false;
+  bool _isMeasuring = false;
+  final List<Offset> _sheetMeasurePoints = [];
+  String _selectedScale = '১৬" = ১ মাইল';
+  final List<String> _scaleOptions = const ['১৬" = ১ মাইল', '৩২" = ১ মাইল', '৬৪" = ১ মাইল', '৮০" = ১ মাইল'];
+
+  // Download state
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  String? _downloadedFilePath;
+  int _imageKey = 0; // for force reload
+
   int _selectedPlotIndex = 4; // Default to Dag 105 (Area: 33,000 sq ft, 75.758 dec)
   String? _selectedDagInfo = 'দাগ ১০৫ নির্বাচিত | খতিয়ান নং: ১২ | আনুমানিক: ৭৫.৭৫৮ শতক (৩৩,০০০ sq ft)';
 
@@ -840,7 +862,36 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
     [Offset(280, 370), Offset(430, 375), Offset(420, 470), Offset(270, 465)],
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Default to authentic scan if cloud file exists
+    _showAuthenticScan = (widget.cloudItem != null && widget.cloudItem!.downloadUrl != null);
+  }
+
+  double get _scaleFeetPerPixel {
+    switch (_selectedScale) {
+      case '১৬" = ১ মাইল':
+        return 330.0 / 60.0; // 5.5 ft per pt
+      case '৩২" = ১ মাইল':
+        return 165.0 / 60.0; // 2.75 ft per pt
+      case '৬৪" = ১ মাইল':
+        return 82.5 / 60.0; // 1.375 ft per pt
+      case '৮০" = ১ মাইল':
+        return 66.0 / 60.0; // 1.1 ft per pt
+      default:
+        return 5.5;
+    }
+  }
+
   void _onMapTapped(Offset localPos) {
+    if (_isMeasuring) {
+      setState(() {
+        _sheetMeasurePoints.add(localPos);
+      });
+      return;
+    }
+
     for (int i = 0; i < _plotPolygons.length; i++) {
       final poly = _plotPolygons[i];
       if (_isPointInsidePolygon(localPos, poly)) {
@@ -851,7 +902,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
             _selectedDagInfo = 'দাগ ১০৫ নির্বাচিত | খতিয়ান নং: ১২ | আনুমানিক: ৭৫.৭৫৮ শতক (৩৩,০০০ sq ft)';
           } else {
             final approxDec = (20.0 + (i * 4.7)).toStringAsFixed(3);
-            _selectedDagInfo = 'দাগ ${BanglaNumerals.toBangla(dagNo)} নির্বাচিত | খতিয়ান নং: ${BanglaNumerals.toBangla(i + 8)} | আনুমানিক: $approxDec শতক';
+            _selectedDagInfo =
+                'দাগ ${BanglaNumerals.toBangla(dagNo)} নির্বাচিত | খতিয়ান নং: ${BanglaNumerals.toBangla(i + 8)} | আনুমানিক: $approxDec শতক';
           }
         });
         break;
@@ -863,7 +915,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
     bool inside = false;
     for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
       if (((poly[i].dy > point.dy) != (poly[j].dy > point.dy)) &&
-          (point.dx < (poly[j].dx - poly[i].dx) * (point.dy - poly[i].dy) / (poly[j].dy - poly[i].dy) + poly[i].dx)) {
+          (point.dx <
+              (poly[j].dx - poly[i].dx) * (point.dy - poly[i].dy) / (poly[j].dy - poly[i].dy) + poly[i].dx)) {
         inside = !inside;
       }
     }
@@ -872,7 +925,6 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
 
   List<Offset> _getNormalizedCadPoints() {
     if (_selectedPlotIndex == 4) {
-      // Dag 105 exact points matching Image 3 (Area: 33,000 sq ft, 75.758 decimal)
       return const [
         Offset(60, 60),
         Offset(260, 60),
@@ -882,6 +934,56 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
     }
     final raw = _plotPolygons[_selectedPlotIndex];
     return raw.map((p) => Offset((p.dx - 20) * 0.8 + 40, (p.dy - 20) * 0.7 + 50)).toList();
+  }
+
+  Future<void> _downloadMouzaMapFile() async {
+    if (widget.cloudItem?.downloadUrl == null) {
+      _downloadMapPdf();
+      return;
+    }
+
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      final path = await MouzaCloudService().downloadMouzaFile(
+        downloadUrl: widget.cloudItem!.downloadUrl!,
+        fileName: widget.cloudItem!.name,
+        onProgress: (p) {
+          if (mounted) setState(() => _downloadProgress = p);
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _downloadedFilePath = path;
+        });
+
+        if (path != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('নকশা ডাউনলোড সম্পন্ন হয়েছে!\nসংরক্ষিত: $path'),
+              backgroundColor: AppColors.primaryGreen,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ডাউনলোড সম্পন্ন হয়নি। সরাসরি ব্রাউজারে লিংক ওপেন করুন।'),
+              backgroundColor: AppColors.accentCrimson,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   void _downloadMapPdf() async {
@@ -914,7 +1016,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                     color: PdfColors.amber50,
                   ),
                   child: pw.Center(
-                    child: pw.Text('নকশা ড্রয়িং ও ক্যাডাস্ট্রাল প্লট ম্যাপ\n(স্কেল: ১৬ ইঞ্চি = ১ মাইল / গান্টার চেইন)'),
+                    child: pw.Text('নকশা ড্রয়িং ও ক্যাডাস্ট্রাল প্লট ম্যাপ\n(স্কেল: $_selectedScale / গান্টার চেইন)'),
                   ),
                 ),
               ),
@@ -934,15 +1036,40 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
 
   @override
   Widget build(BuildContext context) {
+    final hasCloudFile = widget.cloudItem != null && widget.cloudItem!.downloadUrl != null;
+
+    // Measurement computations
+    double measuredPerimeterFt = 0.0;
+    double measuredAreaSqFt = 0.0;
+    if (_sheetMeasurePoints.length >= 2) {
+      for (int i = 0; i < _sheetMeasurePoints.length - 1; i++) {
+        final p1 = _sheetMeasurePoints[i];
+        final p2 = _sheetMeasurePoints[i + 1];
+        measuredPerimeterFt += (p2 - p1).distance * _scaleFeetPerPixel;
+      }
+    }
+    if (_sheetMeasurePoints.length >= 3) {
+      // Shoelace formula
+      double areaPx = 0.0;
+      for (int i = 0; i < _sheetMeasurePoints.length; i++) {
+        final p1 = _sheetMeasurePoints[i];
+        final p2 = _sheetMeasurePoints[(i + 1) % _sheetMeasurePoints.length];
+        areaPx += (p1.dx * p2.dy) - (p2.dx * p1.dy);
+      }
+      measuredAreaSqFt = (areaPx.abs() / 2.0) * (_scaleFeetPerPixel * _scaleFeetPerPixel);
+    }
+    final measuredDecimal = measuredAreaSqFt / 435.60;
+    final measuredKatha = measuredAreaSqFt / 720.00;
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.90,
+      height: MediaQuery.of(context).size.height * 0.92,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
-          // Header Bar
+          // 1. Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
@@ -952,22 +1079,50 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'মৌজা: ${widget.item.mouzaName} (জে.এল. ${widget.item.jlNo})',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.cloudItem != null
+                                  ? widget.cloudItem!.name
+                                  : 'মৌজা: ${widget.item.mouzaName} (জে.এল. ${widget.item.jlNo})',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (widget.cloudItem != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0x33FFFFFF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                widget.cloudItem!.name.endsWith('.pdf') ? 'PDF নকশা' : 'অরিজিনাল স্ক্যান',
+                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                    Text(
-                      '${widget.item.upazila}, ${widget.item.district} | ${widget.item.surveyType}',
-                      style: const TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        '${widget.item.upazila}, ${widget.item.district} | ${widget.item.surveyType}'
+                        '${widget.cloudItem?.size != null ? ' | ${(widget.cloudItem!.size! / 1048576).toStringAsFixed(1)} MB' : ''}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
@@ -977,90 +1132,291 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
             ),
           ),
 
-          // Sheet Selector Bar
+          // 2. Mode Selector Bar (Original Scan vs CAD Vector)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.grey.shade100,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: const Color(0xFFF1F5F9),
             child: Row(
               children: [
-                const Text('শিট নির্বাচন: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(width: 8),
-                Wrap(
-                  spacing: 6,
-                  children: List.generate(widget.item.totalSheets, (i) {
-                    final sheetNum = i + 1;
-                    final isSel = _selectedSheetIndex == sheetNum;
-                    return InkWell(
-                      onTap: () => setState(() => _selectedSheetIndex = sheetNum),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isSel ? AppColors.primaryGreen : Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isSel ? AppColors.primaryGreen : Colors.grey.shade300,
-                          ),
-                        ),
-                        child: Text(
-                          'শিট ${BanglaNumerals.toBangla(sheetNum)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                            color: isSel ? Colors.white : Colors.black87,
-                          ),
+                if (hasCloudFile) ...[
+                  InkWell(
+                    onTap: () => setState(() => _showAuthenticScan = true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _showAuthenticScan ? AppColors.primaryGreen : Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _showAuthenticScan ? AppColors.primaryGreen : Colors.grey.shade300,
                         ),
                       ),
-                    );
-                  }),
-                ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.image,
+                            size: 14,
+                            color: _showAuthenticScan ? Colors.white : Colors.black87,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'আসল স্ক্যান নকশা',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _showAuthenticScan ? FontWeight.bold : FontWeight.normal,
+                              color: _showAuthenticScan ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => setState(() => _showAuthenticScan = false),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: !_showAuthenticScan ? AppColors.primaryGreen : Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: !_showAuthenticScan ? AppColors.primaryGreen : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.polyline,
+                            size: 14,
+                            color: !_showAuthenticScan ? Colors.white : Colors.black87,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ক্যাডাস্ট্রাল ভেক্টর',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: !_showAuthenticScan ? FontWeight.bold : FontWeight.normal,
+                              color: !_showAuthenticScan ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
-                // Gunia toggle
+                // Gunia toggle chip
                 FilterChip(
                   label: const Text('গুনিয়া স্কেল', style: TextStyle(fontSize: 11)),
                   selected: _showGunia,
                   selectedColor: Colors.amber.shade200,
                   onSelected: (val) => setState(() => _showGunia = val),
                 ),
+                const SizedBox(width: 6),
+                // On-sheet measurement toggle chip
+                FilterChip(
+                  label: const Text('নকশায় মাপুন', style: TextStyle(fontSize: 11)),
+                  selected: _isMeasuring,
+                  selectedColor: const Color(0xFFBAE6FD),
+                  onSelected: (val) => setState(() => _isMeasuring = val),
+                ),
               ],
             ),
           ),
 
-          // Interactive Map Canvas Area
+          // 3. Scale & Measurement Options Sub-bar (when measuring or in authentic scan)
+          if (_isMeasuring || _showAuthenticScan)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              color: const Color(0xFFE2E8F0),
+              child: Row(
+                children: [
+                  const Text('মৌজা স্কেল: ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  DropdownButton<String>(
+                    value: _selectedScale,
+                    isDense: true,
+                    style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.bold),
+                    items: _scaleOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedScale = val);
+                    },
+                  ),
+                  const Spacer(),
+                  if (_sheetMeasurePoints.isNotEmpty) ...[
+                    Text(
+                      'পয়েন্ট: ${BanglaNumerals.toBangla(_sheetMeasurePoints.length)} টি',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryGreenDark),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => setState(() => _sheetMeasurePoints.clear()),
+                      child: const Text('মুছুন', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+          // 4. Interactive Canvas (Authentic Scan or CAD Vector)
           Expanded(
             child: Stack(
               children: [
-                InteractiveViewer(
-                  boundaryMargin: const EdgeInsets.all(50),
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Center(
-                    child: Container(
-                      width: 500,
-                      height: 500,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAF6EE),
-                        border: Border.all(color: const Color(0xFFC7B299), width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
+                if (_showAuthenticScan && hasCloudFile)
+                  // Authentic High-Resolution Scanned Cadastral Sheet Viewer
+                  InteractiveViewer(
+                    boundaryMargin: const EdgeInsets.all(200),
+                    minScale: 0.1,
+                    maxScale: 25.0,
+                    child: Center(
                       child: GestureDetector(
                         onTapUp: (details) => _onMapTapped(details.localPosition),
-                        child: CustomPaint(
-                          painter: _InteractiveMouzaPainter(
-                            mouzaName: widget.item.mouzaName,
-                            sheetNo: _selectedSheetIndex,
-                            jlNo: widget.item.jlNo,
-                            selectedPlotIndex: _selectedPlotIndex,
+                        child: Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAF6EE),
+                                border: Border.all(color: const Color(0xFF78350F), width: 2),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x33000000),
+                                    blurRadius: 10,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Image.network(
+                                widget.cloudItem!.downloadUrl!,
+                                key: ValueKey('mouza_img_${widget.cloudItem!.name}_$_imageKey'),
+                                fit: BoxFit.contain,
+                                headers: const {
+                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0',
+                                },
+                                loadingBuilder: (ctx, child, progress) {
+                                  if (progress == null) return child;
+                                  final total = progress.expectedTotalBytes;
+                                  final loaded = progress.cumulativeBytesLoaded;
+                                  final pct = total != null && total > 0 ? (loaded / total * 100).toStringAsFixed(0) : '';
+
+                                  return Container(
+                                    width: 480,
+                                    height: 520,
+                                    color: const Color(0xFFFAF6EE),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const CircularProgressIndicator(color: AppColors.primaryGreen),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'অরিজিনাল মৌজা নকশা লোড হচ্ছে... ${pct.isNotEmpty ? '$pct%' : ''}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '${(loaded / 1048576).toStringAsFixed(1)} MB'
+                                            '${total != null ? ' / ${(total / 1048576).toStringAsFixed(1)} MB' : ''}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (ctx, err, stack) {
+                                  return Container(
+                                    width: 480,
+                                    height: 520,
+                                    padding: const EdgeInsets.all(24),
+                                    color: const Color(0xFFFEF2F2),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.cloud_off, color: Color(0xFFEF4444), size: 48),
+                                          const SizedBox(height: 12),
+                                          const Text(
+                                            'অনলাইন সার্ভার থেকে সরাসরি নকশা লোড হতে দেরি হচ্ছে',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          const Text(
+                                            '(গুগল ড্রাইভ প্রক্সি কোটা লিমিট বা নেটওয়ার্ক ধীরগতি হতে পারে)',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          ElevatedButton.icon(
+                                            onPressed: () => setState(() => _imageKey++),
+                                            icon: const Icon(Icons.refresh),
+                                            label: const Text('পুনরায় চেষ্টা করুন (Retry)'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primaryGreen,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          OutlinedButton.icon(
+                                            onPressed: () => setState(() => _showAuthenticScan = false),
+                                            icon: const Icon(Icons.polyline),
+                                            label: const Text('ক্যাড ভেক্টর মোডে দেখুন'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            // On-sheet Custom Measurement Overlay
+                            if (_sheetMeasurePoints.isNotEmpty)
+                              Positioned.fill(
+                                child: CustomPaint(
+                                  painter: _SheetMeasurementPainter(
+                                    points: _sheetMeasurePoints,
+                                    feetPerPixel: _scaleFeetPerPixel,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  // CAD Vector Plot Simulation Canvas
+                  InteractiveViewer(
+                    boundaryMargin: const EdgeInsets.all(50),
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Center(
+                      child: Container(
+                        width: 500,
+                        height: 500,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAF6EE),
+                          border: Border.all(color: const Color(0xFFC7B299), width: 2),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x14000000),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: GestureDetector(
+                          onTapUp: (details) => _onMapTapped(details.localPosition),
+                          child: CustomPaint(
+                            painter: _InteractiveMouzaPainter(
+                              mouzaName: widget.item.mouzaName,
+                              sheetNo: _selectedSheetIndex,
+                              jlNo: widget.item.jlNo,
+                              selectedPlotIndex: _selectedPlotIndex,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
                 // Floating Gunia Scale Overlay
                 if (_showGunia)
@@ -1069,8 +1425,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                     onClose: () => setState(() => _showGunia = false),
                   ),
 
-                // Selected Dag Floating Banner
-                if (_selectedDagInfo != null)
+                // Selected Dag Floating Banner (for vector mode)
+                if (!_showAuthenticScan && _selectedDagInfo != null)
                   Positioned(
                     bottom: 16,
                     left: 20,
@@ -1080,8 +1436,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x1F000000), blurRadius: 6),
                         ],
                       ),
                       child: Row(
@@ -1102,11 +1458,137 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                       ),
                     ),
                   ),
+
+                // Live On-Sheet Measurement Result Card (for authentic scan mode)
+                if (_showAuthenticScan && _sheetMeasurePoints.length >= 2)
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF20F172A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.straighten, color: Color(0xFF38BDF8), size: 16),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'নকশায় ফিল্ড মেজারমেন্ট',
+                                    style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                'স্কেল: $_selectedScale',
+                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  const Text('পরিসীমা', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                                  Text(
+                                    '${BanglaFormatter.formatNumber(measuredPerimeterFt, fractionDigits: 1)} ft',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  Text(
+                                    '(${BanglaFormatter.formatNumber(measuredPerimeterFt / 0.66, fractionDigits: 1)} link)',
+                                    style: const TextStyle(color: Color(0xFF4ADE80), fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                              if (_sheetMeasurePoints.length >= 3) ...[
+                                Column(
+                                  children: [
+                                    const Text('জমির পরিমাণ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                                    Text(
+                                      '${BanglaFormatter.formatNumber(measuredDecimal, fractionDigits: 3)} শতক',
+                                      style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                    Text(
+                                      '${BanglaFormatter.formatNumber(measuredKatha, fractionDigits: 2)} কাঠা',
+                                      style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  children: [
+                                    const Text('বর্গফুট', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                                    Text(
+                                      '${BanglaFormatter.formatNumber(measuredAreaSqFt, fractionDigits: 0)} sq ft',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Download Progress Overlay
+                if (_isDownloading)
+                  Container(
+                    color: const Color(0x99000000),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(color: AppColors.primaryGreen),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'আসল মৌজা নকশা ডাউনলোড হচ্ছে...',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: 200,
+                              child: LinearProgressIndicator(
+                                value: _downloadProgress > 0 ? _downloadProgress : null,
+                                color: AppColors.primaryGreen,
+                                backgroundColor: Colors.grey.shade200,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${(_downloadProgress * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
 
-          // Bottom Action Bar: Measure & Download
+          // 5. Bottom Action Bar: Measure & Download
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -1117,9 +1599,17 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _downloadMapPdf,
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('নকশা PDF ডাউনলোড'),
+                    onPressed: _isDownloading ? null : _downloadMouzaMapFile,
+                    icon: Icon(
+                      widget.cloudItem?.name.endsWith('.pdf') == true
+                          ? Icons.picture_as_pdf
+                          : Icons.download_for_offline,
+                    ),
+                    label: Text(
+                      widget.cloudItem != null
+                          ? (widget.cloudItem!.name.endsWith('.pdf') ? 'নকশা PDF ডাউনলোড' : 'আসল নকশা ডাউনলোড')
+                          : 'নকশা PDF ডাউনলোড',
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -1158,6 +1648,119 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
       ),
     );
   }
+}
+
+class _SheetMeasurementPainter extends CustomPainter {
+  final List<Offset> points;
+  final double feetPerPixel;
+
+  const _SheetMeasurementPainter({
+    required this.points,
+    required this.feetPerPixel,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF0284C7)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    final closedPaint = Paint()
+      ..color = const Color(0x330284C7)
+      ..style = PaintingStyle.fill;
+
+    // 1. Draw polygon fill if 3+ points
+    if (points.length >= 3) {
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (int i = 1; i < points.length; i++) {
+        path.lineTo(points[i].dx, points[i].dy);
+      }
+      path.close();
+      canvas.drawPath(path, closedPaint);
+      canvas.drawPath(path, linePaint);
+    } else if (points.length == 2) {
+      canvas.drawLine(points[0], points[1], linePaint);
+    }
+
+    // 2. Draw side measurements
+    final segCount = points.length >= 3 ? points.length : points.length - 1;
+    for (int i = 0; i < segCount; i++) {
+      final p1 = points[i];
+      final p2 = points[(i + 1) % points.length];
+      final distPx = (p2 - p1).distance;
+      final distFt = distPx * feetPerPixel;
+      final distLink = distFt / 0.66;
+
+      final mid = Offset((p1.dx + p2.dx) / 2.0, (p1.dy + p2.dy) / 2.0);
+
+      _drawMeasurementLabel(
+        canvas,
+        '${distFt.toStringAsFixed(1)} ft (${distLink.toStringAsFixed(0)} link)',
+        mid,
+      );
+    }
+
+    // 3. Draw vertex pins
+    for (int i = 0; i < points.length; i++) {
+      final p = points[i];
+
+      final pinOuter = Paint()
+        ..color = const Color(0xFF0369A1)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(p, 10, pinOuter);
+
+      final pinInner = Paint()
+        ..color = const Color(0xFF38BDF8)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(p, 6, pinInner);
+
+      final whiteDot = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(p, 2.5, whiteDot);
+    }
+  }
+
+  void _drawMeasurementLabel(Canvas canvas, String text, Offset center) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final bgRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: center,
+        width: tp.width + 10,
+        height: tp.height + 6,
+      ),
+      const Radius.circular(4),
+    );
+
+    final bgPaint = Paint()..color = const Color(0xCC0F172A);
+    canvas.drawRRect(bgRect, bgPaint);
+
+    final borderPaint = Paint()
+      ..color = const Color(0xFF38BDF8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawRRect(bgRect, borderPaint);
+
+    tp.paint(canvas, Offset(center.dx - tp.width / 2.0, center.dy - tp.height / 2.0));
+  }
+
+  @override
+  bool shouldRepaint(covariant _SheetMeasurementPainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.feetPerPixel != feetPerPixel;
 }
 
 class _InteractiveMouzaPainter extends CustomPainter {
@@ -1222,7 +1825,7 @@ class _InteractiveMouzaPainter extends CustomPainter {
       // Highlight selected plot with cyan glow fill
       if (i == selectedPlotIndex) {
         final fillPaint = Paint()
-          ..color = const Color(0xFF06B6D4).withOpacity(0.25)
+          ..color = const Color(0x4006B6D4)
           ..style = PaintingStyle.fill;
         canvas.drawPath(path, fillPaint);
 
