@@ -166,7 +166,7 @@ class BangladeshAdministrativeData {
       id: '11',
       divisionId: '3',
       name: 'Narayanganj',
-      bnName: 'নারায়াণগঞ্জ',
+      bnName: 'নারায়ণগঞ্জ',
       lat: 23.63366,
       lng: 90.496482,
     ),

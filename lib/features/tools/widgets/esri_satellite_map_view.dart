@@ -87,6 +87,10 @@ class EsriSatelliteMapView extends StatefulWidget {
   @override
   State<EsriSatelliteMapView> createState() => _EsriSatelliteMapViewState();
 
+  // Hyperbolic math functions (not present in standard dart:math)
+  static double _sinh(double x) => (math.exp(x) - math.exp(-x)) / 2.0;
+  static double _asinh(double x) => math.log(x + math.sqrt(x * x + 1.0));
+
   // Mathematical utility functions for Web Mercator (EPSG:3857)
   static Offset latLngToWorldPixels(double lat, double lng, double zoom) {
     final worldSize = 256.0 * math.pow(2.0, zoom);
@@ -101,7 +105,7 @@ class EsriSatelliteMapView extends StatefulWidget {
     final worldSize = 256.0 * math.pow(2.0, zoom);
     final lng = (px / worldSize * 360.0) - 180.0;
     final n = math.pi - (py / worldSize * 2.0 * math.pi);
-    final lat = 180.0 / math.pi * math.atan(math.sinh(n));
+    final lat = 180.0 / math.pi * math.atan(_sinh(n));
     return LatLngPoint(lat, lng);
   }
 
@@ -109,7 +113,7 @@ class EsriSatelliteMapView extends StatefulWidget {
     final latRad = lat * math.pi / 180.0;
     final n = math.pow(2.0, zoom);
     final x = ((lng + 180.0) / 360.0 * n).floor();
-    final y = ((1.0 - math.asinh(math.tan(latRad)) / math.pi) / 2.0 * n).floor();
+    final y = ((1.0 - _asinh(math.tan(latRad)) / math.pi) / 2.0 * n).floor();
     return math.Point<int>(x, y);
   }
 
