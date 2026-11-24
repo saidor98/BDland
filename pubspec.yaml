@@ -25,3 +25,4 @@ flutter:
   assets:
     - assets/mouza_maps/
     - assets/geo/
+    - assets/images/

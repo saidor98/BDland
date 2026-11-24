@@ -72,6 +72,7 @@ class EsriSatelliteMapView extends StatefulWidget {
   final bool showNudgeDpad;
   final List<LatLngPoint>? partitionSplitLine;
   final ValueChanged<int?>? onVertexSelected;
+  final void Function(String url)? onAttributionTap;
 
   const EsriSatelliteMapView({
     super.key,
@@ -94,6 +95,7 @@ class EsriSatelliteMapView extends StatefulWidget {
     this.showNudgeDpad = false,
     this.partitionSplitLine,
     this.onVertexSelected,
+    this.onAttributionTap,
   });
 
   @override
@@ -267,6 +269,54 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     list[_selectedVertexIndex!] = updated;
     widget.onPointsChanged?.call(list);
     setState(() {});
+  }
+
+  void _handleAttributionAction(String url) {
+    if (widget.onAttributionTap != null) {
+      widget.onAttributionTap!(url);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: AppColors.primaryGreen, size: 20),
+            SizedBox(width: 8),
+            Text('ম্যাপ অ্যাট্রিবিউশন ও লাইসেন্স', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'এই ম্যাপ লেয়ারটি Mapbox ও OpenStreetMap ডাটাবেস দ্বারা পরিচালিত।',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: SelectableText(
+                url,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ঠিক আছে'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getTileUrl(int z, int x, int y) {
@@ -865,29 +915,73 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_isMapboxActive) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6),
-                          borderRadius: BorderRadius.circular(2),
+                      // Official Mapbox logo asset
+                      InkWell(
+                        onTap: () => _handleAttributionAction('https://www.mapbox.com/about/maps/'),
+                        child: Image.asset(
+                          'assets/images/mapbox_logo.png',
+                          height: 14,
+                          fit: BoxFit.contain,
+                          errorBuilder: (ctx, err, stack) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text(
+                              'mapbox',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Interactive link for Mapbox
+                      InkWell(
+                        onTap: () => _handleAttributionAction('https://www.mapbox.com/about/maps/'),
                         child: const Text(
-                          'mapbox',
+                          '© Mapbox',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Colors.white70,
                             fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.2,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),
                       const SizedBox(width: 5),
-                      const Text(
-                        '© Mapbox © OpenStreetMap',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
+                      // Interactive link for OpenStreetMap
+                      InkWell(
+                        onTap: () => _handleAttributionAction('https://www.openstreetmap.org/copyright'),
+                        child: const Text(
+                          '© OpenStreetMap',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      // Interactive link for Improve this map
+                      InkWell(
+                        onTap: () => _handleAttributionAction(
+                          'https://www.mapbox.com/map-feedback/#/${_centerLng.toStringAsFixed(5)}/${_centerLat.toStringAsFixed(5)}/${_zoom.toStringAsFixed(1)}',
+                        ),
+                        child: const Text(
+                          'Improve this map',
+                          style: TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                     ] else if (_activeLayer == SatelliteLayerType.osmRoads) ...[
