@@ -480,7 +480,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.5,
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.5),
+                            color: const Color(0x800284C7),
                           ),
                         ),
                       ),
@@ -542,11 +542,11 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+                    color: const Color(0xE00F172A),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                      BoxShadow(color: const Color(0x4D000000), blurRadius: 6, offset: const Offset(0, 2)),
                     ],
                   ),
                   child: Row(
@@ -584,7 +584,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                     if (widget.showLayerSwitcher) ...[
                       FloatingActionButton.small(
                         heroTag: 'map_layer_btn',
-                        backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xE60F172A),
                         foregroundColor: const Color(0xFF38BDF8),
                         onPressed: showLayerSelectorDialog,
                         tooltip: 'লেয়ার পরিবর্তন',
@@ -595,7 +595,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                     if (widget.showLocationJump)
                       FloatingActionButton.small(
                         heroTag: 'map_jump_btn',
-                        backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xE60F172A),
                         foregroundColor: const Color(0xFFFBBF24),
                         onPressed: showLocationJumpDialog,
                         tooltip: 'বিভাগ ও জেলা নির্বাচন (GeoJSON)',
@@ -614,7 +614,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                   children: [
                     FloatingActionButton.small(
                       heroTag: 'map_zoom_in',
-                      backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                      backgroundColor: const Color(0xE60F172A),
                       foregroundColor: Colors.white,
                       onPressed: zoomIn,
                       tooltip: 'জুম ইন (+)',
@@ -623,7 +623,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                     const SizedBox(height: 6),
                     FloatingActionButton.small(
                       heroTag: 'map_zoom_out',
-                      backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                      backgroundColor: const Color(0xE60F172A),
                       foregroundColor: Colors.white,
                       onPressed: zoomOut,
                       tooltip: 'জুম আউট (-)',
@@ -823,7 +823,7 @@ class _SatelliteCadastralPainter extends CustomPainter {
 
     // 1. Draw glowing cyan boundary polygon
     final polyFill = Paint()
-      ..color = const Color(0xFF0284C7).withValues(alpha: 0.25)
+      ..color = const Color(0x400284C7)
       ..style = PaintingStyle.fill;
 
     final polyStroke = Paint()
@@ -894,7 +894,7 @@ class _SatelliteCadastralPainter extends CustomPainter {
       canvas.drawCircle(
         sp,
         isDragged ? 12.0 : 8.0,
-        Paint()..color = (isDragged ? Colors.amber : const Color(0xFF0284C7)).withValues(alpha: 0.4),
+        Paint()..color = isDragged ? const Color(0x66FFC107) : const Color(0x660284C7),
       );
 
       // Core pin
@@ -937,7 +937,7 @@ class _SatelliteCadastralPainter extends CustomPainter {
       Rect.fromCenter(center: pos, width: tp.width + 6, height: tp.height + 4),
       const Radius.circular(4),
     );
-    canvas.drawRRect(rrect, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.90));
+    canvas.drawRRect(rrect, Paint()..color = const Color(0xE60F172A));
     canvas.drawRRect(rrect, Paint()..color = const Color(0xFF475569)..style = PaintingStyle.stroke..strokeWidth = 0.8);
     tp.paint(canvas, Offset(pos.dx - tp.width / 2.0, pos.dy - tp.height / 2.0));
   }
@@ -955,7 +955,7 @@ class _SatelliteCadastralPainter extends CustomPainter {
       Rect.fromCenter(center: pos, width: tp.width + 12, height: tp.height + 6),
       const Radius.circular(6),
     );
-    canvas.drawRRect(rrect, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.88));
+    canvas.drawRRect(rrect, Paint()..color = const Color(0xE00F172A));
     canvas.drawRRect(rrect, Paint()..color = const Color(0xFF334155)..style = PaintingStyle.stroke..strokeWidth = 1);
     tp.paint(canvas, Offset(pos.dx - tp.width / 2.0, pos.dy - tp.height / 2.0));
   }

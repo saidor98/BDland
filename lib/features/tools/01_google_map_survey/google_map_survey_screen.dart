@@ -344,11 +344,11 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+                      color: const Color(0xE00F172A),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                        BoxShadow(color: const Color(0x4D000000), blurRadius: 6, offset: const Offset(0, 2)),
                       ],
                     ),
                     child: Row(
@@ -383,11 +383,11 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                      color: const Color(0xEB0F172A),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFF334155), width: 1.0),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: const Color(0x66000000), blurRadius: 10, offset: const Offset(0, 4)),
                       ],
                     ),
                     child: Column(
@@ -431,7 +431,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                     children: [
                       FloatingActionButton.small(
                         heroTag: 'survey_zoom_in',
-                        backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xE60F172A),
                         foregroundColor: Colors.white,
                         onPressed: () => _mapController.zoomIn(),
                         tooltip: 'জুম ইন (+)',
@@ -440,7 +440,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                       const SizedBox(height: 6),
                       FloatingActionButton.small(
                         heroTag: 'survey_zoom_out',
-                        backgroundColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                        backgroundColor: const Color(0xE60F172A),
                         foregroundColor: Colors.white,
                         onPressed: () => _mapController.zoomOut(),
                         tooltip: 'জুম আউট (-)',

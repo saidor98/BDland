@@ -121,7 +121,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+                      color: const Color(0xE00F172A),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
                     ),
@@ -146,7 +146,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
+                      color: const Color(0xB3000000),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.white24),
                     ),
@@ -278,7 +278,7 @@ class _CadastralOverlaySheetPainter extends CustomPainter {
     final sheetRect = Rect.fromLTWH(left, top, sheetW, sheetH);
 
     // 1. Semi-transparent parchment mouza paper
-    final bgPaint = Paint()..color = const Color(0xFFFFF9E6).withValues(alpha: 0.85);
+    final bgPaint = Paint()..color = const Color(0xD9FFF9E6);
     canvas.drawRRect(RRect.fromRectAndRadius(sheetRect, const Radius.circular(4)), bgPaint);
 
     final borderPaint = Paint()
@@ -289,7 +289,7 @@ class _CadastralOverlaySheetPainter extends CustomPainter {
 
     // 2. Light cadastral grid lines
     final gridPaint = Paint()
-      ..color = const Color(0xFFD97706).withValues(alpha: 0.25)
+      ..color = const Color(0x40D97706)
       ..strokeWidth = 0.8;
     for (double x = left + 20; x < left + sheetW; x += 30) {
       canvas.drawLine(Offset(x, top), Offset(x, top + sheetH), gridPaint);
@@ -342,7 +342,7 @@ class _CadastralOverlaySheetPainter extends CustomPainter {
 
     // River / Canal strip across the middle
     final canalPaint = Paint()
-      ..color = const Color(0xFF60A5FA).withValues(alpha: 0.4)
+      ..color = const Color(0x6660A5FA)
       ..style = PaintingStyle.fill;
     final canalPath = Path()
       ..moveTo(left + 8, r2Top + r2H + 4)
