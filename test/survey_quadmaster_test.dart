@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bdland_pro/features/tools/05_quadmaster/quadmaster_screen.dart';
+import 'package:bdland_pro/features/tools/19_hindu_inheritance/hindu_inheritance_screen.dart';
 import 'package:bdland_pro/features/tools/widgets/touch_magnifier_loupe.dart';
 
 void main() {
@@ -66,6 +67,42 @@ void main() {
 
       // Should show snackbar that there's no redo history
       expect(find.text('সামনে যাওয়ার তথ্য নেই'), findsOneWidget);
+    });
+
+    testWidgets('QuadMaster switches between all 4 functional tabs', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(const MaterialApp(home: QuadMasterScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('২  পদ্ধতি'));
+      await tester.pumpAndSettle();
+      expect(find.text('হেরন সূত্র (আইনসম্মত ২ ত্রিভুজ পদ্ধতি)'), findsOneWidget);
+
+      await tester.tap(find.text('৩  ক্ষেত্রফল'));
+      await tester.pumpAndSettle();
+      expect(find.text('সকল ভূমি এককে প্রকৃত ক্ষেত্রফল'), findsOneWidget);
+
+      await tester.tap(find.text('৪  বণ্টন'));
+      await tester.pumpAndSettle();
+      expect(find.text('অংশীদার / ওয়ারিশদের মাঝে সমান বণ্টন'), findsOneWidget);
+    });
+  });
+
+  group('HinduInheritanceScreen 1937 Act Tests', () {
+    testWidgets('Widow receives equal 1/3 share alongside 2 sons under 1937 Act', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: HinduInheritanceScreen()));
+      await tester.pumpAndSettle();
+
+      // Default: 100.0 decimal, 2 sons, 1 widow -> 2 parts (66.667) + 1 part (33.333)
+      expect(find.textContaining('পুত্র / ছেলে'), findsOneWidget);
+      expect(find.textContaining('বিধবা স্ত্রী (১ জন)'), findsOneWidget);
+      expect(find.textContaining('১৯৩৭ সালের আইন'), findsOneWidget);
     });
   });
 

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
+import '../../khatian/models/ana_gonda_share.dart';
 
 class DagPlotItem {
   final String dagNo;
@@ -27,14 +30,15 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
     const DagPlotItem(dagNo: '১০৫', totalAreaDecimal: 35.0),
   ];
 
-  void _addPlot() {
-    final dagCtrl = TextEditingController();
-    final areaCtrl = TextEditingController();
+  void _addOrEditPlot({int? editIndex}) {
+    final existing = editIndex != null ? _plots[editIndex] : null;
+    final dagCtrl = TextEditingController(text: existing?.dagNo ?? '');
+    final areaCtrl = TextEditingController(text: existing?.totalAreaDecimal.toString() ?? '');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('নতুন দাগ যোগ করুন'),
+        title: Text(existing == null ? 'নতুন দাগ যোগ করুন' : 'দাগের তথ্য সম্পাদনা'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -50,19 +54,26 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
               final dNo = dagCtrl.text.trim();
               final a = double.tryParse(areaCtrl.text) ?? 0.0;
               if (dNo.isNotEmpty && a > 0) {
-                setState(() => _plots.add(DagPlotItem(dagNo: dNo, totalAreaDecimal: a)));
+                setState(() {
+                  final item = DagPlotItem(dagNo: dNo, totalAreaDecimal: a);
+                  if (editIndex != null) {
+                    _plots[editIndex] = item;
+                  } else {
+                    _plots.add(item);
+                  }
+                });
               }
               Navigator.pop(ctx);
             },
-            child: const Text('যোগ করুন'),
+            child: Text(existing == null ? 'যোগ করুন' : 'আপডেট করুন'),
           ),
         ],
       ),
     );
   }
 
-  void _copyReport() {
-    final share = double.tryParse(_shareDecimalCtrl.text) ?? 0.0;
+  String _buildReportText() {
+    final share = (double.tryParse(_shareDecimalCtrl.text) ?? 0.0).clamp(0.0, 1.0);
     double totalAccumulated = 0;
 
     final buffer = StringBuffer();
@@ -70,7 +81,7 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
     buffer.writeln('তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}');
     buffer.writeln('মালিকের নাম: ${_ownerNameCtrl.text}');
     buffer.writeln('খতিয়ান নং: ${_khatianNoCtrl.text}');
-    buffer.writeln('খতিয়ানে হিস্যা: ${BanglaFormatter.formatNumber(share, fractionDigits: 6)} (${BanglaFormatter.formatPercentage(share * 100)})\n');
+    buffer.writeln('খতিয়ানে হিস্যা: ${BanglaFormatter.formatNumber(share, fractionDigits: 6)} (${BanglaFormatter.formatPercentage(share * 100)} | ${AnaGondaShare.fromFraction(share).toBanglaText()})\n');
 
     buffer.writeln('[দাগসমূহের বিবরণ]');
     for (final p in _plots) {
@@ -81,20 +92,48 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
     buffer.writeln('\n----------------------------------------');
     buffer.writeln('সর্বমোট প্রাপ্ত জমি: ${BanglaFormatter.formatNumber(totalAccumulated, fractionDigits: 3)} শতক (${BanglaFormatter.formatLandBreakdown(totalAccumulated * 435.60)})');
     buffer.writeln('অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
+    return buffer.toString();
+  }
 
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
+  void _copyReport() {
+    Clipboard.setData(ClipboardData(text: _buildReportText()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('দাগের অংশ রিপোর্ট কপি করা হয়েছে!')));
+  }
+
+  Future<void> _saveToHistory() async {
+    final rawShare = double.tryParse(_shareDecimalCtrl.text) ?? 0.0;
+    final share = rawShare.clamp(0.0, 1.0);
+    final total = _plots.fold<double>(0.0, (sum, p) => sum + p.totalAreaDecimal * share);
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'dag_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'দাগের অংশ: খতিয়ান ${_khatianNoCtrl.text}',
+        category: 'খতিয়ান',
+        timestamp: DateTime.now(),
+        inputSummary: '${_ownerNameCtrl.text} | হিস্যা: $share',
+        resultSummary: '${BanglaFormatter.formatNumber(total, fractionDigits: 3)} শতক (${_plots.length}টি দাগ)',
+        fullReportBangla: _buildReportText(),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('দাগওয়ারী অংশ ইতিহাসে সেভ হয়েছে'), backgroundColor: AppColors.primaryGreen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final share = double.tryParse(_shareDecimalCtrl.text) ?? 0.0;
+    final rawShare = double.tryParse(_shareDecimalCtrl.text) ?? 0.0;
+    final isShareInvalid = rawShare < 0 || rawShare > 1.0;
+    final share = rawShare.clamp(0.0, 1.0);
+    final anaGonda = AnaGondaShare.fromFraction(share);
     double totalAllocated = 0.0;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('দাগের অংশ ক্যালকুলেটর'),
         actions: [
+          IconButton(icon: const Icon(Icons.bookmark_add_outlined), tooltip: 'ইতিহাসে সেভ', onPressed: _saveToHistory),
           IconButton(icon: const Icon(Icons.copy), tooltip: 'কপি রিপোর্ট', onPressed: _copyReport),
         ],
       ),
@@ -118,12 +157,26 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
                           child: TextField(
                             controller: _shareDecimalCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'হিস্যা (যেমন 0.1250)'),
+                            decoration: const InputDecoration(labelText: 'হিস্যা (০.০০০ থেকে ১.০০০)'),
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    if (isShareInvalid)
+                      const Text(
+                        'সতর্কতা: খতিয়ানের হিস্যা ১.০০০০০০ (১৬ আনা) এর বেশি হতে পারে না।',
+                        style: TextStyle(color: AppColors.errorRed, fontSize: 12, fontWeight: FontWeight.bold),
+                      )
+                    else
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'আনা-গণ্ডায়: ${anaGonda.toBanglaText()} (${BanglaFormatter.formatPercentage(share * 100)})',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primaryGreenDark, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -140,7 +193,7 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('খতিয়ানের অন্তর্ভুক্ত দাগসমূহ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        ElevatedButton.icon(onPressed: _addPlot, icon: const Icon(Icons.add, size: 18), label: const Text('দাগ যোগ')),
+                        ElevatedButton.icon(onPressed: () => _addOrEditPlot(), icon: const Icon(Icons.add, size: 18), label: const Text('দাগ যোগ')),
                       ],
                     ),
                     const Divider(height: 16),
@@ -150,25 +203,28 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
                       final alloc = p.totalAreaDecimal * share;
                       totalAllocated += alloc;
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: AppColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
-                        child: Row(
-                          children: [
-                            Text('দাগ নং ${p.dagNo}:', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            Text('মোট: ${BanglaFormatter.formatNumber(p.totalAreaDecimal)} শতক'),
-                            const Spacer(),
-                            Text(
-                              'প্রাপ্ত: ${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.accentCrimson),
-                              onPressed: () => setState(() => _plots.removeAt(idx)),
-                            ),
-                          ],
+                      return InkWell(
+                        onTap: () => _addOrEditPlot(editIndex: idx),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: AppColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
+                          child: Row(
+                            children: [
+                              Text('দাগ নং ${p.dagNo}:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                              Text('মোট: ${BanglaFormatter.formatNumber(p.totalAreaDecimal)} শতক'),
+                              const Spacer(),
+                              Text(
+                                'প্রাপ্ত: ${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.accentCrimson),
+                                onPressed: () => setState(() => _plots.removeAt(idx)),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     }),

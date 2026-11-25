@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
+import '../../khatian/models/ana_gonda_share.dart';
 
 class KhatianAuditOwner {
   final String name;
@@ -29,20 +32,21 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
     const KhatianAuditOwner(name: 'মো: শফিকুল ইসলাম', shareDecimal: 0.2500), // 4 Ana
   ];
 
-  void _addOwner() {
-    final nameCtrl = TextEditingController();
-    final shareCtrl = TextEditingController(text: '0.1250');
+  void _addOrEditOwner({int? editIndex}) {
+    final existing = editIndex != null ? _owners[editIndex] : null;
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final shareCtrl = TextEditingController(text: existing != null ? existing.shareDecimal.toString() : '0.1250');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('খতিয়ানের অংশীদার যোগ'),
+        title: Text(existing == null ? 'খতিয়ানের অংশীদার যোগ' : 'অংশীদারের হিস্যা সম্পাদনা'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'মালিকের নাম')),
             const SizedBox(height: 10),
-            TextField(controller: shareCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'হিস্যা (দশমিকে)')),
+            TextField(controller: shareCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'হিস্যা (দশমিকে, যেমন ০.১২৫০)')),
           ],
         ),
         actions: [
@@ -52,18 +56,25 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
               final n = nameCtrl.text.trim();
               final s = double.tryParse(shareCtrl.text) ?? 0.0;
               if (n.isNotEmpty && s > 0) {
-                setState(() => _owners.add(KhatianAuditOwner(name: n, shareDecimal: s)));
+                setState(() {
+                  final owner = KhatianAuditOwner(name: n, shareDecimal: s);
+                  if (editIndex != null) {
+                    _owners[editIndex] = owner;
+                  } else {
+                    _owners.add(owner);
+                  }
+                });
               }
               Navigator.pop(ctx);
             },
-            child: const Text('যোগ করুন'),
+            child: Text(existing == null ? 'যোগ করুন' : 'আপডেট করুন'),
           ),
         ],
       ),
     );
   }
 
-  void _copyReport() {
+  String _buildReportText() {
     final totalLand = double.tryParse(_totalLandCtrl.text) ?? 0;
     final sumShare = _owners.fold<double>(0, (sum, o) => sum + o.shareDecimal);
     final isValid = (sumShare - 1.0).abs() < 0.0001;
@@ -78,15 +89,39 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
     buffer.writeln('[মালিক ও হিস্যা বিশ্লেষণ]');
     for (final o in _owners) {
       final alloc = totalLand * o.shareDecimal;
-      buffer.writeln('• ${o.name}: হিস্যা ${BanglaFormatter.formatNumber(o.shareDecimal, fractionDigits: 6)} (${BanglaFormatter.formatPercentage(o.shareDecimal * 100)}) -> ${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক');
+      final ana = AnaGondaShare.fromFraction(o.shareDecimal);
+      buffer.writeln('• ${o.name}: হিস্যা ${BanglaFormatter.formatNumber(o.shareDecimal, fractionDigits: 6)} (${ana.toBanglaText()}) -> ${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক');
     }
     buffer.writeln('\n----------------------------------------');
     buffer.writeln('মোট হিস্যা যোগফল: ${BanglaFormatter.formatNumber(sumShare, fractionDigits: 6)}');
     buffer.writeln(isValid ? 'স্ট্যাটাস: খতিয়ানের হিস্যা ষোল আনা (১.০০০০০০) সম্পূর্ণ সঠিক।' : 'সতর্কতা: হিস্যার যোগফলে গরমিল বিদ্যমান (${BanglaFormatter.formatNumber((sumShare - 1.0).abs(), fractionDigits: 6)})');
     buffer.writeln('\nঅ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
+    return buffer.toString();
+  }
 
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
+  void _copyReport() {
+    Clipboard.setData(ClipboardData(text: _buildReportText()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('খতিয়ান অডিট রিপোর্ট কপি করা হয়েছে!')));
+  }
+
+  Future<void> _saveToHistory() async {
+    final totalLand = double.tryParse(_totalLandCtrl.text) ?? 0;
+    final sumShare = _owners.fold<double>(0, (sum, o) => sum + o.shareDecimal);
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'khatian_${DateTime.now().millisecondsSinceEpoch}',
+        title: '$_surveyType #${_khatianNoCtrl.text} (${_mouzaCtrl.text})',
+        category: 'খতিয়ান',
+        timestamp: DateTime.now(),
+        inputSummary: 'মোট জমি: ${BanglaFormatter.formatNumber(totalLand)} শতক | ${_owners.length} জন মালিক',
+        resultSummary: 'হিস্যা যোগফল: ${BanglaFormatter.formatNumber(sumShare, fractionDigits: 4)}',
+        fullReportBangla: _buildReportText(),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('খতিয়ান অডিট ইতিহাসে সেভ করা হয়েছে'), backgroundColor: AppColors.primaryGreen),
+    );
   }
 
   @override
@@ -94,11 +129,13 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
     final totalLand = double.tryParse(_totalLandCtrl.text) ?? 0;
     final sumShare = _owners.fold<double>(0, (sum, o) => sum + o.shareDecimal);
     final is16Ana = (sumShare - 1.0).abs() < 0.0001;
+    final deltaShare = 1.0 - sumShare;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('খতিয়ান বিশ্লেষণ ও অডিট'),
         actions: [
+          IconButton(icon: const Icon(Icons.bookmark_add_outlined), tooltip: 'ইতিহাসে সেভ', onPressed: _saveToHistory),
           IconButton(icon: const Icon(Icons.copy), tooltip: 'কপি রিপোর্ট', onPressed: _copyReport),
         ],
       ),
@@ -178,6 +215,16 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
                             'মোট হিস্যা যোগফল: ${BanglaFormatter.formatNumber(sumShare, fractionDigits: 6)} (আদর্শ: ১.০০০০০০)',
                             style: const TextStyle(fontSize: 12),
                           ),
+                          if (!is16Ana)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                deltaShare > 0
+                                    ? 'অবশিষ্ট কম: ${BanglaFormatter.formatNumber(deltaShare, fractionDigits: 6)} (${AnaGondaShare.fromFraction(deltaShare).toBanglaText()})'
+                                    : 'অতিরিক্ত বেশি: ${BanglaFormatter.formatNumber(-deltaShare, fractionDigits: 6)} (${AnaGondaShare.fromFraction(-deltaShare).toBanglaText()})',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.errorRed),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -197,7 +244,7 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('মালিকগণের হিস্যা ও জমি তালিকা', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        ElevatedButton.icon(onPressed: _addOwner, icon: const Icon(Icons.add, size: 18), label: const Text('মালিক যোগ')),
+                        ElevatedButton.icon(onPressed: () => _addOrEditOwner(), icon: const Icon(Icons.add, size: 18), label: const Text('মালিক যোগ')),
                       ],
                     ),
                     const Divider(height: 16),
@@ -205,33 +252,37 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
                       final idx = entry.key;
                       final o = entry.value;
                       final alloc = totalLand * o.shareDecimal;
+                      final ana = AnaGondaShare.fromFraction(o.shareDecimal);
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: AppColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(o.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('হিস্যা: ${BanglaFormatter.formatNumber(o.shareDecimal, fractionDigits: 6)} (${BanglaFormatter.formatPercentage(o.shareDecimal * 100)})',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                ],
+                      return InkWell(
+                        onTap: () => _addOrEditOwner(editIndex: idx),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: AppColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(o.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('হিস্যা: ${BanglaFormatter.formatNumber(o.shareDecimal, fractionDigits: 6)} (${ana.toBanglaText()})',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
-                            ),
-                            if (_owners.length > 1)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.accentCrimson),
-                                onPressed: () => setState(() => _owners.removeAt(idx)),
+                              Text(
+                                '${BanglaFormatter.formatNumber(alloc, fractionDigits: 3)} শতক',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
                               ),
-                          ],
+                              if (_owners.length > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.accentCrimson),
+                                  onPressed: () => setState(() => _owners.removeAt(idx)),
+                                ),
+                            ],
+                          ),
                         ),
                       );
                     }),

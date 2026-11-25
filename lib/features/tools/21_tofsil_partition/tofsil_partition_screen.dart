@@ -5,7 +5,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/pdf_report_helper.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class TofsilPartitionScreen extends StatefulWidget {
   const TofsilPartitionScreen({super.key});
@@ -75,9 +78,22 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
     );
   }
 
-  void _printTofsilPdf() async {
-    final pdf = pw.Document();
+  Future<void> _printTofsilPdf() async {
+    final theme = await PdfReportHelper.loadBengaliTheme();
+    final pdf = pw.Document(theme: theme);
     final text = _generateFormalTofsilText();
+
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'tofsil_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'তফসিল বিবরণী: ${_mouzaCtrl.text} (দাগ ${_dagCtrl.text})',
+        category: 'খতিয়ান',
+        timestamp: DateTime.now(),
+        inputSummary: 'খতিয়ান: ${_khatianCtrl.text} | দাগ: ${_dagCtrl.text} | মোট: ${_totalLandCtrl.text} শতক',
+        resultSummary: 'বণ্টনকৃত: ${_partitionLandCtrl.text} শতক',
+        fullReportBangla: text,
+      ),
+    );
 
     pdf.addPage(
       pw.Page(

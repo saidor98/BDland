@@ -1,8 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/polygon_geometry.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class AnyShapeDividerScreen extends StatefulWidget {
   const AnyShapeDividerScreen({super.key});
@@ -12,22 +16,91 @@ class AnyShapeDividerScreen extends StatefulWidget {
 }
 
 class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
-  // Base polygon vertices (feet scale)
-  final List<Offset> _polygon = [
-    const Offset(60, 60),
-    const Offset(280, 50),
-    const Offset(300, 240),
-    const Offset(40, 220),
+  // Interactive polygon vertices (feet space)
+  List<Offset> _polygon = [
+    const Offset(0, 0),
+    const Offset(220, -10),
+    const Offset(240, 180),
+    const Offset(-20, 160),
   ];
 
-  double _splitRatioA = 50.0; // percentage
+  double _splitRatioA = 50.0; // percentage 10..90
   String _splitDirection = 'উত্তর-দক্ষিণ (Vertical)';
+  final _targetLandScaleCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _targetLandScaleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveToHistory(double totalDec, double portionA, double portionB) async {
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'AnyShape বণ্টন (${BanglaFormatter.formatNumber(totalDec, fractionDigits: 2)} শতক)',
+        category: 'জ্যামিতি',
+        timestamp: DateTime.now(),
+        inputSummary: 'অনুপাত ${BanglaNumerals.toBangla(_splitRatioA.toInt())}% : ${BanglaNumerals.toBangla((100 - _splitRatioA).toInt())}% | $_splitDirection',
+        resultSummary: 'ক: ${BanglaFormatter.formatNumber(portionA, fractionDigits: 2)} শতক | খ: ${BanglaFormatter.formatNumber(portionB, fractionDigits: 2)} শতক',
+        fullReportBangla: _buildReport(totalDec, portionA, portionB),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('বণ্টন হিসাব হিস্ট্রিতে সংরক্ষিত হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
+  void _showScaleTotalAreaDialog(double currentDec) {
+    _targetLandScaleCtrl.text = currentDec.toStringAsFixed(2);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('মোট জমি কাস্টম সেট করুন'),
+        content: TextField(
+          controller: _targetLandScaleCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'প্লটের প্রকৃত মোট জমি (শতক)',
+            border: OutlineInputBorder(),
+            suffixText: 'শতক',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
+          ElevatedButton(
+            onPressed: () {
+              final targetDec = double.tryParse(_targetLandScaleCtrl.text.trim()) ?? 0;
+              if (targetDec > 0 && currentDec > 0) {
+                final scale = math.sqrt(targetDec / currentDec);
+                setState(() {
+                  _polygon = _polygon.map((p) => p * scale).toList();
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('প্রয়োগ করুন'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final totalAreaSqFt = _calculateArea(_polygon);
+    final totalAreaSqFt = PolygonGeometry.calculateArea(_polygon);
     final totalDec = totalAreaSqFt / 435.60;
     final totalKatha = totalAreaSqFt / 720.00;
+
+    final isVerticalCut = _splitDirection.startsWith('উত্তর');
+    final targetAreaA = totalAreaSqFt * (_splitRatioA / 100.0);
+    final cutRes = PolygonGeometry.findAreaBisectionCutLine(
+      polygon: _polygon,
+      targetArea: targetAreaA,
+      horizontalCut: !isVerticalCut,
+      fromStart: true,
+    );
 
     final portionADec = totalDec * (_splitRatioA / 100.0);
     final portionBDec = totalDec * ((100.0 - _splitRatioA) / 100.0);
@@ -36,6 +109,16 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
       appBar: AppBar(
         title: const Text('AnyShape Divider (ভূমি বিভাজন)'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'মোট শতক পরিবর্তন',
+            onPressed: () => _showScaleTotalAreaDialog(totalDec),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'সেভ',
+            onPressed: () => _saveToHistory(totalDec, portionADec, portionBDec),
+          ),
           IconButton(
             icon: const Icon(Icons.copy),
             tooltip: 'কপি রিপোর্ট',
@@ -58,10 +141,23 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('মোট জমি: ${BanglaFormatter.formatNumber(totalDec, fractionDigits: 3)} শতক',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        Text('${BanglaFormatter.formatNumber(totalKatha, fractionDigits: 2)} কাঠা',
-                            style: const TextStyle(color: AppColors.textSecondary)),
+                        InkWell(
+                          onTap: () => _showScaleTotalAreaDialog(totalDec),
+                          child: Row(
+                            children: [
+                              Text(
+                                'মোট জমি: ${BanglaFormatter.formatNumber(totalDec, fractionDigits: 3)} শতক',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.edit, size: 15, color: AppColors.primaryGreenDark),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${BanglaFormatter.formatNumber(totalKatha, fractionDigits: 2)} কাঠা',
+                          style: const TextStyle(color: AppColors.textSecondary),
+                        ),
                       ],
                     ),
                     const Divider(height: 16),
@@ -112,31 +208,89 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Visual Polygon Division Preview
+            // Visual Polygon Division Preview (auto-fitted to viewport)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
                   children: [
-                    const Text('বিভাজন নকশা ও সীমানা নির্ধারণ',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'নিখুঁত ক্ষেত্রফল-ভিত্তিক বিভাজন নকশা',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                        ),
+                        if (cutRes != null)
+                          Text(
+                            'কাট দৈর্ঘ্য: ${BanglaFormatter.formatNumber(cutRes.cutLength, fractionDigits: 1)}\'',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.accentCrimson),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     SizedBox(
-                      height: 230,
+                      height: 240,
                       width: double.infinity,
-                      child: CustomPaint(
-                        painter: _AnyShapePainter(
-                          polygon: _polygon,
-                          splitRatio: _splitRatioA / 100.0,
-                          isVertical: _splitDirection.startsWith('উত্তর'),
-                        ),
+                      child: LayoutBuilder(
+                        builder: (ctx, box) {
+                          return GestureDetector(
+                            onPanUpdate: (details) {
+                              // Drag closest vertex using canvas transform inverse
+                              final tx = _AnyShapePainter.computeTransform(_polygon, Size(box.maxWidth, box.maxHeight));
+                              final localPt = (details.localPosition - tx.offset) / tx.scale;
+                              int? closest;
+                              double best = 36.0 / tx.scale;
+                              for (int i = 0; i < _polygon.length; i++) {
+                                final d = (_polygon[i] - localPt).distance;
+                                if (d < best) {
+                                  best = d;
+                                  closest = i;
+                                }
+                              }
+                              if (closest != null) {
+                                setState(() {
+                                  _polygon[closest!] = localPt;
+                                });
+                              }
+                            },
+                            child: CustomPaint(
+                              painter: _AnyShapePainter(
+                                polygon: _polygon,
+                                cutResult: cutRes,
+                                isVerticalCut: isVerticalCut,
+                              ),
+                            ),
+                          );
+                        },
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('টিপস: কোণগুলো ড্র্যাগ করে প্লটের আকৃতি পরিবর্তন করুন', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _polygon = [
+                                const Offset(0, 0),
+                                const Offset(220, -10),
+                                const Offset(240, 180),
+                                const Offset(-20, 160),
+                              ];
+                            });
+                          },
+                          icon: const Icon(Icons.refresh, size: 15),
+                          label: const Text('রিসেট', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Controls Card
             Card(
@@ -188,19 +342,8 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
     );
   }
 
-  double _calculateArea(List<Offset> pts) {
-    if (pts.length < 3) return 0.0;
-    double sum = 0.0;
-    for (int i = 0; i < pts.length; i++) {
-      final p1 = pts[i];
-      final p2 = pts[(i + 1) % pts.length];
-      sum += (p1.dx * p2.dy) - (p2.dx * p1.dy);
-    }
-    return sum.abs() / 2.0;
-  }
-
-  void _copyReport(double total, double a, double b) {
-    final text = '''
+  String _buildReport(double total, double a, double b) {
+    return '''
 === AnyShape Divider জমি বিভাজন রিপোর্ট ===
 তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}
 মোট জমির পরিমাণ: ${BanglaFormatter.formatNumber(total, fractionDigits: 3)} শতক
@@ -209,84 +352,118 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
 • অংশীদার খ (${BanglaNumerals.toBangla((100 - _splitRatioA).toInt())}%): ${BanglaFormatter.formatNumber(b, fractionDigits: 3)} শতক (${BanglaFormatter.formatLandBreakdown(b * 435.6)})
 অ্যাপ: BDLandPro (বাংলাদেশ ভূমি জরিপ ও পরিমাপ)
 ''';
-    Clipboard.setData(ClipboardData(text: text));
+  }
+
+  void _copyReport(double total, double a, double b) {
+    Clipboard.setData(ClipboardData(text: _buildReport(total, a, b)));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('বিভাজন রিপোর্ট কপি করা হয়েছে!')),
     );
   }
 }
 
+class _FitTransform {
+  final double scale;
+  final Offset offset;
+  const _FitTransform(this.scale, this.offset);
+}
+
 class _AnyShapePainter extends CustomPainter {
   final List<Offset> polygon;
-  final double splitRatio;
-  final bool isVertical;
+  final BisectionCutResult? cutResult;
+  final bool isVerticalCut;
 
   _AnyShapePainter({
     required this.polygon,
-    required this.splitRatio,
-    required this.isVertical,
+    required this.cutResult,
+    required this.isVerticalCut,
   });
+
+  static _FitTransform computeTransform(List<Offset> polygon, Size size) {
+    double minX = polygon[0].dx, maxX = polygon[0].dx;
+    double minY = polygon[0].dy, maxY = polygon[0].dy;
+    for (final p in polygon) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    const pad = 28.0;
+    final w = (maxX - minX).abs().clamp(1.0, 1e9);
+    final h = (maxY - minY).abs().clamp(1.0, 1e9);
+    final availW = (size.width - pad * 2).clamp(20.0, 1e9);
+    final availH = (size.height - pad * 2).clamp(20.0, 1e9);
+    final scale = math.min(availW / w, availH / h);
+    final offset = Offset(
+      (size.width - w * scale) / 2.0 - minX * scale,
+      (size.height - h * scale) / 2.0 - minY * scale,
+    );
+    return _FitTransform(scale, offset);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     if (polygon.length < 3) return;
+    final tx = computeTransform(polygon, size);
+    Offset toScreen(Offset p) => p * tx.scale + tx.offset;
 
-    // Draw base polygon outline
-    final path = Path()..moveTo(polygon[0].dx, polygon[0].dy);
-    for (int i = 1; i < polygon.length; i++) {
-      path.lineTo(polygon[i].dx, polygon[i].dy);
+    final screenPoly = polygon.map(toScreen).toList();
+    final path = Path()..moveTo(screenPoly[0].dx, screenPoly[0].dy);
+    for (int i = 1; i < screenPoly.length; i++) {
+      path.lineTo(screenPoly[i].dx, screenPoly[i].dy);
     }
     path.close();
 
-    // Fill Base Polygon with gradient
     canvas.drawPath(path, Paint()..color = const Color(0xFFE2E8F0));
 
-    // Calculate dividing line along direction
-    // Linear interpolation between opposite edges
-    final cutStart = isVertical
-        ? Offset.lerp(polygon[0], polygon[1], splitRatio)!
-        : Offset.lerp(polygon[0], polygon[3], splitRatio)!;
-
-    final cutEnd = isVertical
-        ? Offset.lerp(polygon[3], polygon[2], splitRatio)!
-        : Offset.lerp(polygon[1], polygon[2], splitRatio)!;
-
-    // Shaded portion A
-    final pathA = Path();
-    if (isVertical) {
-      pathA.moveTo(polygon[0].dx, polygon[0].dy);
-      pathA.lineTo(cutStart.dx, cutStart.dy);
-      pathA.lineTo(cutEnd.dx, cutEnd.dy);
-      pathA.lineTo(polygon[3].dx, polygon[3].dy);
-    } else {
-      pathA.moveTo(polygon[0].dx, polygon[0].dy);
-      pathA.lineTo(polygon[1].dx, polygon[1].dy);
-      pathA.lineTo(cutEnd.dx, cutEnd.dy);
-      pathA.lineTo(cutStart.dx, cutStart.dy);
+    // Exact area-bisected half shading
+    if (cutResult != null) {
+      final cutA = cutResult!.cutStart;
+      final cutB = cutResult!.cutEnd;
+      final bool keepLeft = isVerticalCut;
+      final halfPoly = PolygonGeometry.clipPolygonByHalfPlane(
+        polygon,
+        cutA,
+        cutB,
+        keepLeft: keepLeft,
+      );
+      if (halfPoly.length >= 3) {
+        final sHalf = halfPoly.map(toScreen).toList();
+        final pathA = Path()..moveTo(sHalf[0].dx, sHalf[0].dy);
+        for (int i = 1; i < sHalf.length; i++) {
+          pathA.lineTo(sHalf[i].dx, sHalf[i].dy);
+        }
+        pathA.close();
+        canvas.drawPath(pathA, Paint()..color = AppColors.primaryGreen.withOpacity(0.32));
+      }
     }
-    pathA.close();
-    canvas.drawPath(pathA, Paint()..color = AppColors.primaryGreen.withOpacity(0.35));
 
-    // Polygon border
     canvas.drawPath(path, Paint()..color = AppColors.primaryGreenDark..strokeWidth = 2.5..style = PaintingStyle.stroke);
 
-    // Draw Cut line (লাল বিভাজন রেখা)
-    final cutPaint = Paint()
-      ..color = AppColors.accentCrimson
-      ..strokeWidth = 3.0;
-    canvas.drawLine(cutStart, cutEnd, cutPaint);
+    // Draw vertices
+    for (final sp in screenPoly) {
+      canvas.drawCircle(sp, 5, Paint()..color = Colors.white);
+      canvas.drawCircle(sp, 5, Paint()..color = AppColors.primaryGreenDark..strokeWidth = 1.5..style = PaintingStyle.stroke);
+    }
 
-    // Labels
-    _drawText(canvas, 'অংশ ক', isVertical ? Offset((polygon[0].dx + cutStart.dx) / 2, (polygon[0].dy + polygon[3].dy) / 2) : Offset((polygon[0].dx + polygon[1].dx) / 2, (polygon[0].dy + cutStart.dy) / 2), AppColors.primaryGreenDark);
-    _drawText(canvas, 'অংশ খ', isVertical ? Offset((polygon[1].dx + cutStart.dx) / 2, (polygon[1].dy + polygon[2].dy) / 2) : Offset((polygon[3].dx + polygon[2].dx) / 2, (cutEnd.dy + polygon[2].dy) / 2), AppColors.secondaryGoldDark);
-    _drawText(canvas, 'কাটিং লাইন (${BanglaNumerals.toBangla((cutEnd - cutStart).distance.toStringAsFixed(1))}\')', Offset((cutStart.dx + cutEnd.dx) / 2, (cutStart.dy + cutEnd.dy) / 2 - 12), AppColors.accentCrimson);
+    if (cutResult != null) {
+      final cs = toScreen(cutResult!.cutStart);
+      final ce = toScreen(cutResult!.cutEnd);
+      canvas.drawLine(cs, ce, Paint()..color = AppColors.accentCrimson..strokeWidth = 3.0);
+      _drawText(
+        canvas,
+        'কাটিং লাইন (${BanglaNumerals.toBangla(cutResult!.cutLength.toStringAsFixed(1))}\')',
+        Offset((cs.dx + ce.dx) / 2, (cs.dy + ce.dy) / 2 - 12),
+        AppColors.accentCrimson,
+      );
+    }
   }
 
   void _drawText(Canvas canvas, String text, Offset offset, Color color) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Hind Siliguri'),
+        style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.bold, fontFamily: 'Hind Siliguri'),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

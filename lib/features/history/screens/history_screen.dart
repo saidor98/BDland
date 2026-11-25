@@ -21,6 +21,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final List<String> _categories = [
     'সব',
     'জ্যামিতি',
+    'গুগল ম্যাপ',
+    'মৌজা ম্যাপ',
     'একক রূপান্তর',
     'খতিয়ান',
     'ফারায়েজ',

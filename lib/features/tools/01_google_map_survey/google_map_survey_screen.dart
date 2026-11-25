@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/services/history_service.dart';
+import '../../../core/utils/polygon_geometry.dart';
 import '../../history/models/calculation_history_item.dart';
 import '../widgets/esri_satellite_map_view.dart';
 
@@ -33,15 +34,38 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   // Selected vertex and partition split line
   int? _selectedVertexIndex;
   List<LatLngPoint>? _partitionSplitLine;
-
-  // Current simulated GPS location
-  double _currentLat = 23.8110;
-  double _currentLng = 90.4126;
-  final double _gpsAccuracyMeters = 0.012; // High-precision RTK Fix
+  final List<List<LatLngPoint>> _undoStack = [];
+  final List<List<LatLngPoint>> _redoStack = [];
 
   // Computed metrics
   double _areaSqFt = 0.0;
   double _perimeterFt = 0.0;
+
+  void _recordUndoSnapshot() {
+    _undoStack.add(List<LatLngPoint>.from(_surveyPoints));
+    if (_undoStack.length > 30) _undoStack.removeAt(0);
+    _redoStack.clear();
+  }
+
+  void _undoPoints() {
+    if (_undoStack.isEmpty) return;
+    _redoStack.add(List<LatLngPoint>.from(_surveyPoints));
+    setState(() {
+      _surveyPoints = _undoStack.removeLast();
+      _partitionSplitLine = null;
+      _recompute();
+    });
+  }
+
+  void _redoPoints() {
+    if (_redoStack.isEmpty) return;
+    _undoStack.add(List<LatLngPoint>.from(_surveyPoints));
+    setState(() {
+      _surveyPoints = _redoStack.removeLast();
+      _partitionSplitLine = null;
+      _recompute();
+    });
+  }
 
   @override
   void initState() {
@@ -91,6 +115,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
 
   void _addPointAtCenterReticle() {
     final center = _mapController.currentCenter;
+    _recordUndoSnapshot();
     setState(() {
       _surveyPoints.add(center);
       _selectedVertexIndex = _surveyPoints.length - 1;
@@ -110,10 +135,9 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
 
   void _addCurrentGpsPoint() {
     final center = _mapController.currentCenter;
+    _recordUndoSnapshot();
     setState(() {
       _surveyPoints.add(center);
-      _currentLat = center.latitude;
-      _currentLng = center.longitude;
       _selectedVertexIndex = _surveyPoints.length - 1;
       _recompute();
     });
@@ -121,7 +145,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'GPS পয়েন্ট ${BanglaNumerals.toBangla(_surveyPoints.length)} রেকর্ড করা হয়েছে! (${center.latitude.toStringAsFixed(6)}° N, ${center.longitude.toStringAsFixed(6)}° E)',
+          'ম্যাপ সেন্টার পিন ${BanglaNumerals.toBangla(_surveyPoints.length)} যুক্ত হয়েছে! (${center.latitude.toStringAsFixed(6)}° N, ${center.longitude.toStringAsFixed(6)}° E)',
         ),
         backgroundColor: AppColors.primaryGreen,
         duration: const Duration(seconds: 2),
@@ -192,6 +216,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
               }
 
               final newPt = LatLngPoint(lat, lng);
+              _recordUndoSnapshot();
               setState(() {
                 _surveyPoints.add(newPt);
                 _selectedVertexIndex = _surveyPoints.length - 1;
@@ -270,6 +295,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                 return;
               }
 
+              _recordUndoSnapshot();
               setState(() {
                 _surveyPoints[index] = LatLngPoint(lat, lng);
                 _recompute();
@@ -338,9 +364,12 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                               'পয়েন্ট ${BanglaNumerals.toBangla(idx + 1)}: ',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),
-                            Text(
-                              '${p.latitude.toStringAsFixed(6)}°, ${p.longitude.toStringAsFixed(6)}°',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF0369A1)),
+                            Flexible(
+                              child: Text(
+                                '${p.latitude.toStringAsFixed(6)}°, ${p.longitude.toStringAsFixed(6)}°',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF0369A1)),
+                              ),
                             ),
                           ],
                         ),
@@ -383,6 +412,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                               icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                               tooltip: 'পয়েন্ট মুছুন',
                               onPressed: () {
+                                _recordUndoSnapshot();
                                 setState(() {
                                   _surveyPoints.removeAt(idx);
                                   _recompute();
@@ -413,6 +443,94 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     );
   }
 
+  void _showBearingCompassDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.explore, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('কম্পাস ও বাউন্ডারি বিয়ারিং', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: _surveyPoints.length < 2
+              ? const Text('বিয়ারিং হিসাবের জন্য কমপক্ষে ২টি সার্ভে পয়েন্ট যুক্ত করুন।')
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Text(
+                          'ট্রু নর্থ রেফারেন্স: ০° (EPSG:3857 Web Mercator)\nবর্তমান ম্যাপ সেন্টার: ${_mapController.currentCenter.latitude.toStringAsFixed(6)}° N, ${_mapController.currentCenter.longitude.toStringAsFixed(6)}° E',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...List.generate(_surveyPoints.length, (i) {
+                        final p1 = _surveyPoints[i];
+                        final p2 = _surveyPoints[(i + 1) % _surveyPoints.length];
+                        final distFt = EsriSatelliteMapView.haversineFeet(p1, p2);
+                        final bearing = _calculateBearing(p1, p2);
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 12,
+                            backgroundColor: const Color(0xFF0F172A),
+                            child: Text(
+                              '${BanglaNumerals.toBangla(i + 1)}→${BanglaNumerals.toBangla(((i + 1) % _surveyPoints.length) + 1)}',
+                              style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(
+                            'দৈর্ঘ্য: ${BanglaFormatter.formatNumber(distFt, fractionDigits: 1)} ft (${BanglaFormatter.formatNumber(distFt / 0.66, fractionDigits: 0)} link)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          subtitle: Text(
+                            'ট্রু নর্থ আজিমুথ বিয়ারিং: ${BanglaNumerals.toBangla(bearing.toStringAsFixed(1))}°',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF0369A1)),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              if (_surveyPoints.isNotEmpty) {
+                double avgLat = 0, avgLng = 0;
+                for (final p in _surveyPoints) {
+                  avgLat += p.latitude;
+                  avgLng += p.longitude;
+                }
+                _mapController.jumpTo(
+                  avgLat / _surveyPoints.length,
+                  avgLng / _surveyPoints.length,
+                  zoom: _mapController.currentZoom,
+                );
+              }
+            },
+            child: const Text('প্লট সেন্টারে যান'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
+        ],
+      ),
+    );
+  }
+
   void _showPlotDivisionDialog() {
     if (_surveyPoints.length < 3) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -425,6 +543,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     final katha = _areaSqFt / 720.00;
 
     double splitRatio = 0.50; // 50:50 default
+    bool horizontalCut = true; // true = North-South boundary split (horizontal line), false = East-West
 
     showDialog(
       context: context,
@@ -443,7 +562,9 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
               children: [
                 Icon(Icons.pie_chart, color: AppColors.primaryGreen),
                 SizedBox(width: 8),
-                Text('জমি বণ্টন ও প্লট বিভাজন (অংশীদার)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Flexible(
+                  child: Text('জমি বণ্টন ও প্লট বিভাজন (অংশীদার)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
               ],
             ),
             content: SingleChildScrollView(
@@ -462,9 +583,12 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('মোট পরিমাপকৃত জমি:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        Text(
-                          '${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 0)} sq ft)',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryGreenDark),
+                        Flexible(
+                          child: Text(
+                            '${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 0)} sq ft)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: AppColors.primaryGreenDark),
+                            textAlign: TextAlign.end,
+                          ),
                         ),
                       ],
                     ),
@@ -472,11 +596,12 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   const SizedBox(height: 12),
                   const Text('বণ্টনের অনুপাত নির্বাচন করুন:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       ChoiceChip(
-                        label: const Text('২ সমান ভাগ (৫০:৫০)'),
+                        label: const Text('৫০ : ৫০'),
                         selected: (splitRatio - 0.50).abs() < 0.01,
                         onSelected: (_) => setModalState(() => splitRatio = 0.50),
                       ),
@@ -492,7 +617,35 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  Slider(
+                    value: splitRatio,
+                    min: 0.10,
+                    max: 0.90,
+                    divisions: 80,
+                    activeColor: AppColors.primaryGreen,
+                    label: '${(splitRatio * 100).round()}% : ${(100 - splitRatio * 100).round()}%',
+                    onChanged: (v) => setModalState(() => splitRatio = v),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Text('কাটলাইনের দিক: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      Expanded(
+                        child: DropdownButton<bool>(
+                          isExpanded: true,
+                          value: horizontalCut,
+                          items: const [
+                            DropdownMenuItem(value: true, child: Text('উত্তর-দক্ষিণ বিভাজন (পূর্ব-পশ্চিম রেখা)', style: TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: false, child: Text('পূর্ব-পশ্চিম বিভাজন (উত্তর-দক্ষিণ রেখা)', style: TextStyle(fontSize: 12))),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setModalState(() => horizontalCut = v);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   // Shares Breakdown Card
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -511,7 +664,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                                 Container(width: 10, height: 10, color: const Color(0xFF0284C7)),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'অংশীদার ১ (${(splitRatio * 100).toStringAsFixed(0)}%):',
+                                  'অংশীদার ১ (${BanglaNumerals.toBangla((splitRatio * 100).round())}%):',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                                 ),
                               ],
@@ -539,7 +692,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                                 Container(width: 10, height: 10, color: const Color(0xFFF59E0B)),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'অংশীদার ২ (${((1.0 - splitRatio) * 100).toStringAsFixed(0)}%):',
+                                  'অংশীদার ২ (${BanglaNumerals.toBangla((100 - splitRatio * 100).round())}%):',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                                 ),
                               ],
@@ -579,32 +732,39 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () {
-                  // Compute split line across bounding box
-                  double minLat = _surveyPoints[0].latitude;
-                  double maxLat = _surveyPoints[0].latitude;
-                  double minLng = _surveyPoints[0].longitude;
-                  double maxLng = _surveyPoints[0].longitude;
+                  // Project LatLngPoints to Mercator pixels at z=20 for exact area bisection
+                  const double projZoom = 20.0;
+                  final worldPts = _surveyPoints
+                      .map((p) => EsriSatelliteMapView.latLngToWorldPixels(p.latitude, p.longitude, projZoom))
+                      .toList();
+                  final totalWorldArea = PolygonGeometry.calculateArea(worldPts);
+                  final bisection = PolygonGeometry.findAreaBisectionCutLine(
+                    polygon: worldPts,
+                    targetArea: totalWorldArea * splitRatio,
+                    horizontalCut: horizontalCut,
+                    fromStart: true,
+                  );
 
-                  for (final p in _surveyPoints) {
-                    if (p.latitude < minLat) minLat = p.latitude;
-                    if (p.latitude > maxLat) maxLat = p.latitude;
-                    if (p.longitude < minLng) minLng = p.longitude;
-                    if (p.longitude > maxLng) maxLng = p.longitude;
+                  if (bisection != null) {
+                    final llStart = EsriSatelliteMapView.worldPixelsToLatLng(
+                      bisection.cutStart.dx,
+                      bisection.cutStart.dy,
+                      projZoom,
+                    );
+                    final llEnd = EsriSatelliteMapView.worldPixelsToLatLng(
+                      bisection.cutEnd.dx,
+                      bisection.cutEnd.dy,
+                      projZoom,
+                    );
+                    setState(() {
+                      _partitionSplitLine = [llStart, llEnd];
+                    });
                   }
-
-                  final splitLat = minLat + (maxLat - minLat) * splitRatio;
-
-                  setState(() {
-                    _partitionSplitLine = [
-                      LatLngPoint(splitLat, minLng - 0.0001),
-                      LatLngPoint(splitLat, maxLng + 0.0001),
-                    ];
-                  });
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'ম্যাপে বণ্টন রেখা অঙ্কন করা হয়েছে! অংশীদার ১: ${BanglaFormatter.formatNumber(share1Dec, fractionDigits: 2)} শতক, অংশীদার ২: ${BanglaFormatter.formatNumber(share2Dec, fractionDigits: 2)} শতক',
+                        'ম্যাপে সঠিক ক্ষেত্রফল-ভিত্তিক বণ্টন রেখা অঙ্কন হয়েছে! অংশ ১: ${BanglaFormatter.formatNumber(share1Dec, fractionDigits: 2)} শতক, অংশ ২: ${BanglaFormatter.formatNumber(share2Dec, fractionDigits: 2)} শতক',
                       ),
                       backgroundColor: AppColors.primaryGreen,
                     ),
@@ -771,30 +931,37 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             ),
           ),
 
-          // 2. GPS Walk Mode Status Bar
+          // 2. Reticle Pin Drop vs Manual Draw Mode Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             color: _isGpsWalkMode ? const Color(0xFF1E293B) : Colors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      _isGpsWalkMode ? Icons.directions_walk : Icons.gps_not_fixed,
-                      size: 18,
-                      color: _isGpsWalkMode ? Colors.greenAccent : Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isGpsWalkMode ? 'GPS ফিল্ড ওয়াক মোড চালু (±${_gpsAccuracyMeters}m RTK FIX)' : 'ম্যানুয়াল পিন ড্রপ ও স্যাটেলাইট মেজারমেন্ট',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _isGpsWalkMode ? Colors.white : Colors.black87,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isGpsWalkMode ? Icons.center_focus_strong : Icons.touch_app,
+                        size: 18,
+                        color: _isGpsWalkMode ? Colors.greenAccent : AppColors.primaryGreen,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _isGpsWalkMode
+                              ? 'সেন্টার টার্গেট মোড চালু (ক্রসহেয়ার অনুযায়ী পিন দিন)'
+                              : 'ম্যানুয়াল পিন ড্রপ ও স্যাটেলাইট মেজারমেন্ট',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _isGpsWalkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Switch(
                   value: _isGpsWalkMode,
@@ -805,15 +972,16 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             ),
           ),
 
-          // 3. Live ESRI Satellite Slippy Tile Canvas with Floating HUD & Tool Palette
+          // 3. Live ESRI/Mapbox Satellite Slippy Tile Canvas with Floating HUD & Tool Palette
           Expanded(
             child: Stack(
               children: [
-                // Live ESRI World Imagery Tile Engine
+                // Live Satellite Tile Engine
                 EsriSatelliteMapView(
                   controller: _mapController,
                   surveyPoints: _surveyPoints,
                   onPointsChanged: (pts) {
+                    _recordUndoSnapshot();
                     setState(() {
                       _surveyPoints = pts;
                       _recompute();
@@ -825,14 +993,14 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   initialLayer: SatelliteLayerType.esriSatellite,
                   initialCenter: const LatLngPoint(23.8110, 90.4126),
                   initialZoom: 17.0,
-                  showControls: false, // Hosted in host screen palette and custom controls
-                  showCenterReticle: _activeTool == 'Point',
+                  showControls: false,
+                  showCenterReticle: _isGpsWalkMode || _activeTool == 'Point',
                   showNudgeDpad: true,
                   partitionSplitLine: _partitionSplitLine,
                   onVertexSelected: (idx) => setState(() => _selectedVertexIndex = idx),
                 ),
 
-                // Top Floating GNSS RTK Status Badge (Stitch Design System Token)
+                // Top Floating Map & Survey Telemetry HUD
                 Positioned(
                   top: 12,
                   left: 12,
@@ -853,16 +1021,16 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
+                            color: Color(0xFF38BDF8),
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'RTK: FIX (14 Sats) | H: 0.012m | Mapbox & ESRI HD',
-                          style: TextStyle(
+                        Text(
+                          'WGS84 জিওডেসিক • ${_surveyPoints.length} পিন • Mapbox & ESRI HD',
+                          style: const TextStyle(
                             color: Color(0xFFE2E8F0),
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -871,7 +1039,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   ),
                 ),
 
-                // Right Vertical Floating Palette (CamScanner PDF Design Pattern)
+                // Right Vertical Floating Palette
                 Positioned(
                   top: 12,
                   right: 10,
@@ -906,16 +1074,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                           setState(() => _showDimensions = !_showDimensions);
                         }, isActive: _showDimensions),
                         _buildPaletteTool('বিভাগ', Icons.pie_chart, _showPlotDivisionDialog),
-                        _buildPaletteTool('কম্পাস', Icons.explore, () {
-                          _mapController.jumpTo(
-                            _mapController.currentCenter.latitude,
-                            _mapController.currentCenter.longitude,
-                            zoom: _mapController.currentZoom,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('নর্থ বিয়ারিং ০° (ESRI EPSG:3857 ট্রু নর্থ ক্যালিব্রেটেড)')),
-                          );
-                        }),
+                        _buildPaletteTool('কম্পাস', Icons.explore, _showBearingCompassDialog),
                       ],
                     ),
                   ),
@@ -953,7 +1112,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
 
           // 4. Bottom Control Buttons
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Colors.grey.shade300)),
@@ -970,36 +1129,53 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       icon: const Icon(Icons.add_location_alt),
-                      label: const Text('বর্তমান অবস্থান রেকর্ড করুন (+GPS Point)'),
+                      label: const Text('ক্রসহেয়ার পয়েন্ট যুক্ত করুন (+Point)'),
                     ),
                   )
                 else ...[
                   IconButton.filledTonal(
+                    onPressed: _undoStack.isNotEmpty
+                        ? _undoPoints
+                        : (_surveyPoints.isNotEmpty
+                            ? () {
+                                _recordUndoSnapshot();
+                                setState(() {
+                                  _surveyPoints.removeLast();
+                                  _recompute();
+                                });
+                              }
+                            : null),
+                    icon: const Icon(Icons.undo),
+                    tooltip: 'পূর্বাবস্থা (Undo)',
+                  ),
+                  const SizedBox(width: 4),
+                  if (_redoStack.isNotEmpty) ...[
+                    IconButton.filledTonal(
+                      onPressed: _redoPoints,
+                      icon: const Icon(Icons.redo),
+                      tooltip: 'পুনরাবৃত্তি (Redo)',
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton.filledTonal(
                     onPressed: _surveyPoints.isNotEmpty
                         ? () {
+                            _recordUndoSnapshot();
                             setState(() {
-                              _surveyPoints.removeLast();
+                              _surveyPoints.clear();
+                              _partitionSplitLine = null;
+                              _selectedVertexIndex = null;
                               _recompute();
                             });
                           }
                         : null,
-                    icon: const Icon(Icons.undo),
-                    tooltip: 'পূর্বের পয়েন্ট মুছুন',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: () {
-                      setState(() {
-                        _surveyPoints.clear();
-                        _recompute();
-                      });
-                    },
                     icon: const Icon(Icons.delete_sweep, color: AppColors.accentCrimson),
                     tooltip: 'সব পিন মুছুন',
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   OutlinedButton.icon(
                     onPressed: () {
+                      _recordUndoSnapshot();
                       setState(() {
                         _surveyPoints = [
                           const LatLngPoint(23.8115, 90.4120),
@@ -1007,19 +1183,21 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                           const LatLngPoint(23.8105, 90.4133),
                           const LatLngPoint(23.8105, 90.4119),
                         ];
+                        _partitionSplitLine = null;
+                        _selectedVertexIndex = null;
                         _recompute();
                         _mapController.jumpTo(23.8110, 90.4126, zoom: 17.0);
                       });
                     },
-                    icon: const Icon(Icons.crop_square, size: 18),
-                    label: const Text('নমুনা প্লট'),
+                    icon: const Icon(Icons.crop_square, size: 16),
+                    label: const Text('নমুনা প্লট', style: TextStyle(fontSize: 12)),
                   ),
                   const Spacer(),
                   Text(
                     _selectedVertexIndex != null
-                        ? 'পয়েন্ট ${BanglaNumerals.toBangla(_selectedVertexIndex! + 1)} নির্বাচিত'
+                        ? 'পিন ${BanglaNumerals.toBangla(_selectedVertexIndex! + 1)} নির্বাচিত'
                         : 'পিন: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
                   ),
                 ],
               ],

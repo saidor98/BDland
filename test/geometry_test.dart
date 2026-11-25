@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bdland_pro/core/utils/polygon_geometry.dart';
 import 'package:bdland_pro/features/geometry/services/geometry_calculator.dart';
 
 void main() {
@@ -97,6 +99,59 @@ void main() {
       expect(result.bottomWidth, closeTo(30.0, 0.01));
       expect(result.volumeCFT, greaterThan(0.0));
       expect(result.estimatedCostTaka, equals((result.volumeCFT / 100.0) * 800.0));
+    });
+
+    test('PolygonGeometry bisects trapezoid and triangle accurately', () {
+      // Trapezoid vertices: top width 60, bottom width 100, height 50 -> area = 4000
+      const trapezoid = [
+        Offset(20, 0),
+        Offset(80, 0),
+        Offset(100, 50),
+        Offset(0, 50),
+      ];
+      expect(PolygonGeometry.calculateArea(trapezoid), closeTo(4000.0, 1e-6));
+
+      final halfCut = PolygonGeometry.findAreaBisectionCutLine(
+        polygon: trapezoid,
+        targetArea: 2000.0,
+        horizontalCut: true,
+        fromStart: true,
+      );
+      expect(halfCut, isNotNull);
+      expect(halfCut!.portionArea, closeTo(2000.0, 1.0));
+      final splitCheck = PolygonGeometry.computeSplitLineAreas(
+        trapezoid,
+        halfCut.cutStart,
+        halfCut.cutEnd,
+      );
+      expect(splitCheck.areaLeft + splitCheck.areaRight, closeTo(4000.0, 1.0));
+      expect(splitCheck.areaLeft, closeTo(2000.0, 1.5));
+      expect(splitCheck.areaRight, closeTo(2000.0, 1.5));
+    });
+
+    test('PolygonGeometry solves quadrilateral vertices via Law of Cosines', () {
+      // Valid 100 x 80 rectangle with diagonal sqrt(100^2 + 80^2) ~= 128.0625
+      final solved = PolygonGeometry.solveQuadrilateralVertices(
+        north: 100,
+        east: 80,
+        south: 100,
+        west: 80,
+        diagAC: 128.0625,
+      );
+      expect(solved, isNotNull);
+      expect(solved!.length, equals(4));
+      expect(PolygonGeometry.calculateArea(solved), closeTo(8000.0, 2.0));
+      expect(PolygonGeometry.calculateInteriorAngleDegrees(solved[3], solved[0], solved[1]), closeTo(90.0, 0.5));
+
+      // Impossible triangle inequality returns null
+      final impossible = PolygonGeometry.solveQuadrilateralVertices(
+        north: 20,
+        east: 20,
+        south: 20,
+        west: 20,
+        diagAC: 100,
+      );
+      expect(impossible, isNull);
     });
   });
 }

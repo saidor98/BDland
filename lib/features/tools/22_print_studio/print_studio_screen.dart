@@ -3,6 +3,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
+import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/pdf_report_helper.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class PrintStudioScreen extends StatefulWidget {
   const PrintStudioScreen({super.key});
@@ -21,7 +25,8 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
   final _notesCtrl = TextEditingController(text: 'হেরন্স ফর্মুলায় সরেজমিনে সীমানা পরিমাপপূর্বক দখল বুঝিয়ে দেওয়া হইল।');
 
   Future<void> _generateAndPrintPdf() async {
-    final pdf = pw.Document();
+    final theme = await PdfReportHelper.loadBengaliTheme();
+    final pdf = pw.Document(theme: theme);
 
     final client = _clientNameCtrl.text;
     final surveyor = _surveyorNameCtrl.text;
@@ -32,6 +37,18 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
     final sqFt = dec * 435.60;
     final katha = sqFt / 720.00;
     final notes = _notesCtrl.text;
+
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'print_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'সার্ভে সার্টিফিকেট: $mouza (দাগ $dag)',
+        category: 'জ্যামিতি',
+        timestamp: DateTime.now(),
+        inputSummary: 'মালিক: $client | মৌজা: $mouza, দাগ: $dag',
+        resultSummary: '${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(katha, fractionDigits: 3)} কাঠা)',
+        fullReportBangla: 'ক্লায়েন্ট: $client\nসার্ভেয়ার: $surveyor ($phone)\nমৌজা: $mouza, দাগ: $dag\nজমি: $dec শতক\nমন্তব্য: $notes',
+      ),
+    );
 
     pdf.addPage(
       pw.Page(

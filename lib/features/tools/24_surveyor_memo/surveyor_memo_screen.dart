@@ -1,8 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/pdf_report_helper.dart';
 
 class MemoRecord {
   final String id;
@@ -28,6 +34,53 @@ class MemoRecord {
   });
 
   double get due => totalFee - advancePaid;
+
+  MemoRecord copyWith({
+    String? clientName,
+    String? phone,
+    String? mouza,
+    String? dagNo,
+    String? serviceType,
+    double? totalFee,
+    double? advancePaid,
+    DateTime? date,
+  }) {
+    return MemoRecord(
+      id: id,
+      clientName: clientName ?? this.clientName,
+      phone: phone ?? this.phone,
+      mouza: mouza ?? this.mouza,
+      dagNo: dagNo ?? this.dagNo,
+      serviceType: serviceType ?? this.serviceType,
+      totalFee: totalFee ?? this.totalFee,
+      advancePaid: advancePaid ?? this.advancePaid,
+      date: date ?? this.date,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'clientName': clientName,
+        'phone': phone,
+        'mouza': mouza,
+        'dagNo': dagNo,
+        'serviceType': serviceType,
+        'totalFee': totalFee,
+        'advancePaid': advancePaid,
+        'date': date.toIso8601String(),
+      };
+
+  factory MemoRecord.fromMap(Map<String, dynamic> map) => MemoRecord(
+        id: map['id'] as String? ?? '0',
+        clientName: map['clientName'] as String? ?? '',
+        phone: map['phone'] as String? ?? '',
+        mouza: map['mouza'] as String? ?? '',
+        dagNo: map['dagNo'] as String? ?? '',
+        serviceType: map['serviceType'] as String? ?? 'সরেজমিন জমি পরিমাপ ও সীমানা নির্ধারণ',
+        totalFee: (map['totalFee'] as num?)?.toDouble() ?? 0.0,
+        advancePaid: (map['advancePaid'] as num?)?.toDouble() ?? 0.0,
+        date: DateTime.tryParse(map['date'] as String? ?? '') ?? DateTime.now(),
+      );
 }
 
 class SurveyorMemoScreen extends StatefulWidget {
@@ -38,6 +91,8 @@ class SurveyorMemoScreen extends StatefulWidget {
 }
 
 class _SurveyorMemoScreenState extends State<SurveyorMemoScreen> {
+  static const String _prefsKey = 'bdland_surveyor_memos_v1';
+
   final _clientCtrl = TextEditingController(text: 'মো: জাহিদুল হাসান');
   final _phoneCtrl = TextEditingController(text: '০১৭০০-১২৩৪৫৬');
   final _mouzaCtrl = TextEditingController(text: 'জাফরাবাদ');
@@ -59,6 +114,39 @@ class _SurveyorMemoScreenState extends State<SurveyorMemoScreen> {
       date: DateTime.now().subtract(const Duration(days: 2)),
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemos();
+  }
+
+  Future<void> _loadMemos() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_prefsKey);
+      if (raw != null && raw.isNotEmpty) {
+        final loaded = raw
+            .map((e) => MemoRecord.fromMap(jsonDecode(e) as Map<String, dynamic>))
+            .toList();
+        if (mounted) {
+          setState(() {
+            _recentMemos
+              ..clear()
+              ..addAll(loaded);
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistMemos() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = _recentMemos.map((m) => jsonEncode(m.toMap())).toList();
+      await prefs.setStringList(_prefsKey, encoded);
+    } catch (_) {}
+  }
 
   String _generateMemoText() {
     final total = double.tryParse(_totalFeeCtrl.text) ?? 0;
@@ -96,7 +184,31 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
     );
   }
 
-  void _saveMemo() {
+  Future<void> _printMemoPdf() async {
+    final theme = await PdfReportHelper.loadBengaliTheme();
+    final pdf = pw.Document(theme: theme);
+    final memoText = _generateMemoText();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('BDLandPro - সার্ভেয়ার মেমো ও ক্যাশ রসিদ', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
+              pw.Divider(),
+              pw.SizedBox(height: 12),
+              pw.Text(memoText, style: const pw.TextStyle(fontSize: 12, lineSpacing: 3)),
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'BDLandPro_Surveyor_Memo.pdf');
+  }
+
+  Future<void> _saveMemo() async {
     final total = double.tryParse(_totalFeeCtrl.text) ?? 0;
     final advance = double.tryParse(_advanceCtrl.text) ?? 0;
 
@@ -116,10 +228,40 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
         ),
       );
     });
+    await _persistMemos();
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('মেমো সফলভাবে সংরক্ষণ করা হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+      const SnackBar(content: Text('মেমো স্থায়ীভাবে সংরক্ষণ করা হয়েছে!'), backgroundColor: AppColors.primaryGreen),
     );
+  }
+
+  void _loadMemoIntoForm(MemoRecord m) {
+    setState(() {
+      _clientCtrl.text = m.clientName;
+      _phoneCtrl.text = m.phone;
+      _mouzaCtrl.text = m.mouza;
+      _dagCtrl.text = m.dagNo;
+      _totalFeeCtrl.text = m.totalFee.toStringAsFixed(0);
+      _advanceCtrl.text = m.advancePaid.toStringAsFixed(0);
+      _serviceType = m.serviceType;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${m.clientName}-এর মেমো ফর্মে লোড করা হয়েছে')),
+    );
+  }
+
+  Future<void> _markAsPaid(int index) async {
+    setState(() {
+      final m = _recentMemos[index];
+      _recentMemos[index] = m.copyWith(advancePaid: m.totalFee);
+    });
+    await _persistMemos();
+  }
+
+  Future<void> _deleteMemo(int index) async {
+    setState(() => _recentMemos.removeAt(index));
+    await _persistMemos();
   }
 
   @override
@@ -132,6 +274,7 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
       appBar: AppBar(
         title: const Text('সার্ভেয়ার মেমো ও বিল তৈরি'),
         actions: [
+          IconButton(icon: const Icon(Icons.picture_as_pdf_outlined), tooltip: 'PDF প্রিন্ট', onPressed: _printMemoPdf),
           IconButton(icon: const Icon(Icons.copy), tooltip: 'কপি মেমো', onPressed: _copyMemo),
         ],
       ),
@@ -243,19 +386,39 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
             ),
             const SizedBox(height: 8),
 
-            ..._recentMemos.map((m) {
+            ..._recentMemos.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final m = entry.value;
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
+                  onTap: () => _loadMemoIntoForm(m),
                   title: Text('${m.clientName} (${m.phone})', style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('${m.mouza}, দাগ: ${m.dagNo}\n${m.serviceType} | তারিখ: ${BanglaFormatter.formatDateTime(m.date).split(',')[0]}'),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(BanglaFormatter.formatCurrency(m.totalFee), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-                      Text(m.due <= 0 ? 'পরিশোধিত' : 'বকেয়া: ৳ ${BanglaNumerals.toBangla(m.due.toInt())}',
-                          style: TextStyle(fontSize: 11, color: m.due <= 0 ? AppColors.primaryGreen : AppColors.accentCrimson)),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(BanglaFormatter.formatCurrency(m.totalFee), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                          Text(m.due <= 0 ? 'পরিশোধিত' : 'বকেয়া: ৳ ${BanglaNumerals.toBangla(m.due.toInt())}',
+                              style: TextStyle(fontSize: 11, color: m.due <= 0 ? AppColors.primaryGreen : AppColors.accentCrimson)),
+                        ],
+                      ),
+                      const SizedBox(width: 4),
+                      if (m.due > 0)
+                        IconButton(
+                          icon: const Icon(Icons.check_circle_outline, color: AppColors.primaryGreen, size: 20),
+                          tooltip: 'পরিশোধিত করুন',
+                          onPressed: () => _markAsPaid(idx),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: AppColors.accentCrimson, size: 20),
+                        tooltip: 'মুছুন',
+                        onPressed: () => _deleteMemo(idx),
+                      ),
                     ],
                   ),
                 ),

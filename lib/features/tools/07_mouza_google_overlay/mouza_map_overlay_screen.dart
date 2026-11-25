@@ -1,8 +1,13 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
+import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
 import '../widgets/esri_satellite_map_view.dart';
+import '../widgets/mouza_sheet_image.dart';
 
 class MouzaMapOverlayScreen extends StatefulWidget {
   const MouzaMapOverlayScreen({super.key});
@@ -19,31 +24,96 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
   double _scale = 1.0;
   Offset _panOffset = Offset.zero;
 
-  void _exportKmz() {
+  // Selected overlay source: null = vector demo grid, or asset path
+  String? _selectedSheetAsset;
+
+  static const List<Map<String, String?>> _sheetOptions = [
+    {'label': 'ভেক্টর শিট', 'asset': null},
+    {'label': 'নমুনা শিট ১', 'asset': 'assets/mouza_maps/sample_mouza_sheet_1.jpg'},
+    {'label': 'নমুনা শিট ২', 'asset': 'assets/mouza_maps/sample_mouza_sheet_2.jpg'},
+    {'label': 'কাওরান বাজার', 'asset': 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf'},
+  ];
+
+  Map<String, double> _computeGeoBounds() {
+    final center = _mapController.currentCenter;
+    final zoom = _mapController.currentZoom;
+    final centerPx = EsriSatelliteMapView.latLngToWorldPixels(center.lat, center.lng, zoom);
+    final halfSheetW = (320.0 * _scale) / 2.0;
+    final halfSheetH = (360.0 * _scale) / 2.0;
+
+    // Account for rotation around sheet center by computing axis-aligned bounding box
+    final rad = (_rotation * math.pi) / 180.0;
+    final cosA = math.cos(rad).abs();
+    final sinA = math.sin(rad).abs();
+    final rotHalfW = halfSheetW * cosA + halfSheetH * sinA;
+    final rotHalfH = halfSheetW * sinA + halfSheetH * cosA;
+
+    final sheetCenterWorldX = centerPx.dx + _panOffset.dx;
+    final sheetCenterWorldY = centerPx.dy + _panOffset.dy;
+
+    final nw = EsriSatelliteMapView.worldPixelsToLatLng(
+      sheetCenterWorldX - rotHalfW,
+      sheetCenterWorldY - rotHalfH,
+      zoom,
+    );
+    final se = EsriSatelliteMapView.worldPixelsToLatLng(
+      sheetCenterWorldX + rotHalfW,
+      sheetCenterWorldY + rotHalfH,
+      zoom,
+    );
+
+    return {
+      'north': math.max(nw.lat, se.lat),
+      'south': math.min(nw.lat, se.lat),
+      'east': math.max(nw.lng, se.lng),
+      'west': math.min(nw.lng, se.lng),
+    };
+  }
+
+  Future<void> _exportKmz() async {
+    final bounds = _computeGeoBounds();
+    final north = bounds['north']!.toStringAsFixed(6);
+    final south = bounds['south']!.toStringAsFixed(6);
+    final east = bounds['east']!.toStringAsFixed(6);
+    final west = bounds['west']!.toStringAsFixed(6);
+    final sheetHref = _selectedSheetAsset?.split('/').last ?? 'mouza_sheet_georeferenced.png';
+
     final kml = '''
 <?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Folder>
     <name>BDLandPro_Georeferenced_Mouza_Map_ESRI</name>
     <GroundOverlay>
-      <name>Mouza Overlay Sheet - Aminpur JL 34</name>
+      <name>Mouza Overlay Sheet ($sheetHref)</name>
       <color>${((_opacity * 255).toInt()).toRadixString(16).padLeft(2, '0')}ffffff</color>
-      <Icon><href>mouza_sheet_georeferenced.png</href></Icon>
+      <Icon><href>$sheetHref</href></Icon>
       <LatLonBox>
-        <north>23.6520</north>
-        <south>23.6420</south>
-        <east>90.6060</east>
-        <west>90.5960</west>
-        <rotation>$_rotation</rotation>
+        <north>$north</north>
+        <south>$south</south>
+        <east>$east</east>
+        <west>$west</west>
+        <rotation>${_rotation.toStringAsFixed(2)}</rotation>
       </LatLonBox>
     </GroundOverlay>
   </Folder>
 </kml>
 ''';
-    Clipboard.setData(ClipboardData(text: kml));
+    await Clipboard.setData(ClipboardData(text: kml));
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'overlay_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'ম্যাপ ওভারলে KML ($sheetHref)',
+        category: 'মৌজা ম্যাপ',
+        timestamp: DateTime.now(),
+        inputSummary: 'স্কেল: ${_scale.toStringAsFixed(2)}x | ঘূর্ণন: ${_rotation.toStringAsFixed(1)}°',
+        resultSummary: 'N:$north, S:$south, E:$east, W:$west',
+        fullReportBangla: kml,
+      ),
+    );
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('জিওরেফারেন্সড KML/KMZ কোড ক্লিপবোর্ডে কপি করা হয়েছে! (Google Earth ও QGIS-এ সরাসরি ওপেন করা যাবে)'),
+      SnackBar(
+        content: Text('সঠিক LatLonBox ($north, $east) সহ KML/KMZ ক্লিপবোর্ড ও ইতিহাসে সেভ হয়েছে!'),
         backgroundColor: AppColors.primaryGreen,
       ),
     );
@@ -91,26 +161,42 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                   showControls: true,
                   showLayerTag: true,
                   showZoomButtons: true,
-                  overlayChild: GestureDetector(
-                    onPanUpdate: (details) {
-                      setState(() => _panOffset += details.delta);
-                    },
-                    child: Transform.translate(
-                      offset: _panOffset,
-                      child: Transform.rotate(
-                        angle: (_rotation * 3.14159) / 180.0,
-                        child: Transform.scale(
-                          scale: _scale,
-                          child: Opacity(
-                            opacity: _opacity,
-                            child: CustomPaint(
+                  overlayChild: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final sheetContent = _selectedSheetAsset == null
+                          ? CustomPaint(
                               size: Size.infinite,
                               painter: _CadastralOverlaySheetPainter(),
+                            )
+                          : Center(
+                              child: SizedBox(
+                                width: 320,
+                                height: 360,
+                                child: MouzaSheetImage(
+                                  assetPath: _selectedSheetAsset,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            );
+                      return GestureDetector(
+                        onPanUpdate: (details) {
+                          setState(() => _panOffset += details.delta);
+                        },
+                        child: Transform.translate(
+                          offset: _panOffset,
+                          child: Transform.rotate(
+                            angle: (_rotation * 3.1415926535) / 180.0,
+                            child: Transform.scale(
+                              scale: _scale,
+                              child: Opacity(
+                                opacity: _opacity,
+                                child: sheetContent,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
 
@@ -173,6 +259,23 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
             ),
             child: Column(
               children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _sheetOptions.map((opt) {
+                      final isSel = _selectedSheetAsset == opt['asset'];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6, bottom: 6),
+                        child: ChoiceChip(
+                          label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
+                          selected: isSel,
+                          selectedColor: AppColors.primaryGreen,
+                          onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
                 Row(
                   children: [
                     const Icon(Icons.opacity, size: 20, color: AppColors.primaryGreen),

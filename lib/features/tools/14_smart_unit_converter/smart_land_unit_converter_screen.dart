@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../converter/models/land_unit.dart';
-import '../../converter/services/unit_converter_service.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class SmartLandUnitConverterScreen extends StatefulWidget {
   const SmartLandUnitConverterScreen({super.key});
@@ -20,24 +21,59 @@ class _SmartLandUnitConverterScreenState extends State<SmartLandUnitConverterScr
   // Regional custom katha settings (default 720 sq ft)
   double _customKathaSqFt = 720.0;
 
+  double _effectiveSqFt(LandUnit unit) {
+    if ((_customKathaSqFt - 720.0).abs() > 0.01) {
+      if (unit.type == LandUnitType.katha) return _customKathaSqFt;
+      if (unit.type == LandUnitType.chhatak) return _customKathaSqFt / 16.0;
+      if (unit.type == LandUnitType.bigha) return _customKathaSqFt * 20.0;
+    }
+    return unit.sqFtEquivalent;
+  }
+
+  Future<void> _saveToHistory(double inputVal, double converted, double totalSqFt) async {
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'conv_unit_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'একক রূপান্তর (${_fromUnit.symbolBangla} → ${_toUnit.symbolBangla})',
+        category: 'একক রূপান্তর',
+        timestamp: DateTime.now(),
+        inputSummary: '${BanglaFormatter.formatNumber(inputVal)} ${_fromUnit.banglaName}',
+        resultSummary: '${BanglaFormatter.formatNumber(converted, fractionDigits: 4)} ${_toUnit.symbolBangla}',
+        fullReportBangla: 'মোট বর্গফুট: ${BanglaFormatter.formatNumber(totalSqFt)} ft²\nআঞ্চলিক কাঠা: $_customKathaSqFt বর্গফুট',
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('হিসাব ইতিহাসে সেভ করা হয়েছে'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final inputVal = double.tryParse(_inputCtrl.text) ?? 0.0;
-    final converted = UnitConverterService.convert(
-      value: inputVal,
-      fromUnit: _fromUnit,
-      toUnit: _toUnit,
-    );
-    final all = UnitConverterService.convertToAll(
-      value: inputVal,
-      fromUnit: _fromUnit,
-    );
-    final totalSqFt = inputVal * _fromUnit.sqFtEquivalent;
+    final fromFactor = _effectiveSqFt(_fromUnit);
+    final toFactor = _effectiveSqFt(_toUnit);
+    final totalSqFt = inputVal * fromFactor;
+    final converted = (_fromUnit.type == _toUnit.type)
+        ? inputVal
+        : (toFactor > 0 ? totalSqFt / toFactor : 0.0);
+
+    final all = <LandUnit, double>{};
+    for (final unit in LandUnit.allUnits) {
+      final f = _effectiveSqFt(unit);
+      all[unit] = f > 0 ? totalSqFt / f : 0.0;
+    }
+    final isCustomKatha = (_customKathaSqFt - 720.0).abs() > 0.01;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('শতক-কাঠা-বিঘা-একর স্মার্ট রূপান্তর'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'ইতিহাসে সেভ',
+            onPressed: () => _saveToHistory(inputVal, converted, totalSqFt),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'আঞ্চলিক কাঠার মাপ নির্ধারণ',
@@ -49,6 +85,32 @@ class _SmartLandUnitConverterScreenState extends State<SmartLandUnitConverterScr
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            if (isCustomKatha)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryGoldLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.secondaryGoldDark.withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune, size: 18, color: AppColors.secondaryGoldDark),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'কাস্টম আঞ্চলিক কাঠা সক্রিয়: ১ কাঠা = ${BanglaFormatter.formatNumber(_customKathaSqFt, fractionDigits: 1)} বর্গফুট',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _customKathaSqFt = 720.0),
+                      child: const Text('৭২০-এ ফিরুন'),
+                    ),
+                  ],
+                ),
+              ),
             // Quick preset chips
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -231,9 +293,15 @@ class _SmartLandUnitConverterScreenState extends State<SmartLandUnitConverterScr
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
           ElevatedButton(
             onPressed: () {
-              final v = double.tryParse(ctrl.text) ?? 720;
-              setState(() => _customKathaSqFt = v);
-              Navigator.pop(ctx);
+              final v = double.tryParse(ctrl.text);
+              if (v != null && v >= 100 && v <= 5000) {
+                setState(() => _customKathaSqFt = v);
+                Navigator.pop(ctx);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('সঠিক বর্গফুট মান দিন (যেমন ৭২০, ৯৯০ বা ১৬২০)')),
+                );
+              }
             },
             child: const Text('সংরক্ষণ করুন'),
           ),

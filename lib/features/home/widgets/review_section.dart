@@ -103,25 +103,27 @@ class _ReviewSectionState extends State<ReviewSection> {
 
         const SizedBox(height: 12),
 
-        // Review Cards (Responsive Grid or Wrap)
+        // Review / Expert Cards (Responsive Grid or Wrap)
         LayoutBuilder(
           builder: (ctx, constraints) {
             final isWide = constraints.maxWidth > 650;
+            final firstCard = _tabIndex == 0 ? const _ReviewCard1() : const _ExpertCard1();
+            final secondCard = _tabIndex == 0 ? const _ReviewCard2() : const _ExpertCard2();
             if (isWide) {
-              return const Row(
+              return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _ReviewCard1()),
-                  SizedBox(width: 14),
-                  Expanded(child: _ReviewCard2()),
+                  Expanded(child: firstCard),
+                  const SizedBox(width: 14),
+                  Expanded(child: secondCard),
                 ],
               );
             } else {
-              return const Column(
+              return Column(
                 children: [
-                  _ReviewCard1(),
-                  SizedBox(height: 12),
-                  _ReviewCard2(),
+                  firstCard,
+                  const SizedBox(height: 12),
+                  secondCard,
                 ],
               );
             }
@@ -456,6 +458,108 @@ class _ReviewCard3 extends StatelessWidget {
               fontSize: 12.5,
               color: Colors.grey.shade700,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpertCard1 extends StatelessWidget {
+  const _ExpertCard1();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primaryGreen.withOpacity(0.12),
+                child: const Icon(Icons.engineering, color: AppColors.primaryGreen),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'সার্ভেয়ার আব্দুল হাকিম (সেটেলমেন্ট আমিন)',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'অবসরপ্রাপ্ত সার্ভে অফিসার • বি.সি.এস ভূমি ক্যাডার প্যানেল',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'আদালত ও সরকারি জরিপের নিয়ম মেনে হেরন সূত্রে বিষমবাহু জমি পরিমাপ এবং মুসলিম ফারায়েজ ও হিন্দু দায়ভাগ (১৯৩৭ আইনসহ) হিসাব অসাধারণ নিখুঁত।',
+            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpertCard2 extends StatelessWidget {
+  const _ExpertCard2();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF0284C7).withOpacity(0.12),
+                child: const Icon(Icons.gavel, color: Color(0xFF0284C7)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'অ্যাডভোকেট সাইফুল ইসলাম',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'দেওয়ানী ও ভূমি আইনজীবী, ঢাকা জজ কোর্ট',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'বাটোয়ারা মামলার জন্য ১৬ আনা খতিয়ান অডিট, ১০০০ স্কেলের নামজারি হিস্যা ও চৌহদ্দি তফসিল PDF ডকুমেন্ট সরাসরি প্রিন্ট করা যায়—যা পেশাগত কাজে অনন্য।',
+            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.45),
           ),
         ],
       ),

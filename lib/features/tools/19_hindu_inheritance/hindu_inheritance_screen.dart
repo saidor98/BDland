@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class HinduHeirResult {
   final String title;
@@ -55,17 +57,42 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
 
     final list = <HinduHeirResult>[];
 
-    // Dayabhaga Hindu Law rules (বাংলাদেশের হিন্দু দায়ভাগ আইন)
+    // Dayabhaga Hindu Law rules + Hindu Women's Rights to Property Act, 1937 (applicable in Bangladesh)
     if (_sonsCount > 0) {
-      // 1. Sons inherit exclusively in equal shares
-      list.add(HinduHeirResult(
-        title: 'পুত্র / ছেলে',
-        count: _sonsCount,
-        fraction: 1.0,
-        allocatedDecimal: land,
-        allocatedTaka: taka,
-        legalReason: 'দায়ভাগ আইন অনুযায়ী পুত্রের উপস্থিতিতে অন্য সকলে বঞ্চিত হন এবং পুত্রগণ নিজেদের মধ্যে সমান ভাগে সম্পত্তি পান।',
-      ));
+      if (_widowCount > 0) {
+        // Under 1937 Act, widow shares equally with each son (as life estate)
+        final totalParts = _sonsCount + 1;
+        final sonsFraction = _sonsCount / totalParts;
+        final widowFraction = 1.0 / totalParts;
+        list.add(HinduHeirResult(
+          title: 'পুত্র / ছেলে',
+          count: _sonsCount,
+          fraction: sonsFraction,
+          allocatedDecimal: land * sonsFraction,
+          allocatedTaka: taka * sonsFraction,
+          legalReason:
+              '১৯৩৭ সালের হিন্দু নারীর সম্পত্তি অধিকার আইন ও দায়ভাগ অনুযায়ী পুত্রগণ এবং জীবিত বিধবা মাতা/স্ত্রী সমান হারে অংশ পান।',
+        ));
+        list.add(HinduHeirResult(
+          title: 'বিধবা স্ত্রী',
+          count: _widowCount,
+          fraction: widowFraction,
+          allocatedDecimal: land * widowFraction,
+          allocatedTaka: taka * widowFraction,
+          legalReason:
+              '১৯৩৭ সালের আইন অনুযায়ী বিধবা স্ত্রী প্রতিটি পুত্রের সমান ১টি অংশ (জীবনস্বত্ব / Life Estate হিসেবে) লাভ করেন।',
+        ));
+      } else {
+        // Sons inherit exclusively in equal shares when no widow survives
+        list.add(HinduHeirResult(
+          title: 'পুত্র / ছেলে',
+          count: _sonsCount,
+          fraction: 1.0,
+          allocatedDecimal: land,
+          allocatedTaka: taka,
+          legalReason: 'দায়ভাগ আইন অনুযায়ী পুত্রের উপস্থিতিতে কন্যা ও দূরবর্তী ওয়ারিশ বঞ্চিত হন এবং পুত্রগণ সমান ভাগে পান।',
+        ));
+      }
     } else if (_widowCount > 0) {
       // 2. Widow inherits life estate if no sons
       list.add(HinduHeirResult(
@@ -131,11 +158,10 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
     setState(() => _results = list);
   }
 
-  void _copyReport() {
+  String _buildReportText() {
     final buffer = StringBuffer();
-    buffer.writeln('=== হিন্দু উত্তরাধিকার (দায়ভাগ) বণ্টন রিপোর্ট ===');
+    buffer.writeln('=== হিন্দু উত্তরাধিকার (দায়ভাগ ও ১৯৩৭ আইন) বণ্টন রিপোর্ট ===');
     buffer.writeln('তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}');
-    buffer.writeln('আইন: বাংলাদেশে প্রচলিত দায়ভাগ হিন্দু আইন (Dayabhaga Law)');
     buffer.writeln('বণ্টনযোগ্য মোট জমি: ${_estateDecCtrl.text} শতক | নগদ টাকা: ৳ ${_estateTakaCtrl.text}\n');
 
     for (final r in _results) {
@@ -143,14 +169,35 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
       buffer.writeln('   প্রাপ্ত জমি: ${BanglaFormatter.formatNumber(r.allocatedDecimal, fractionDigits: 3)} শতক');
       buffer.writeln('   নগদ টাকা: ${BanglaFormatter.formatCurrency(r.allocatedTaka)}');
       if (r.count > 1) {
-        buffer.writeln('   জনপ্রতি জমি: ${BanglaFormatter.formatNumber(r.allocatedDecimal / r.count, fractionDigits: 3)} শতক');
+        buffer.writeln('   জনপ্রতি জমি: ${BanglaFormatter.formatNumber(r.allocatedDecimal / r.count, fractionDigits: 3)} শতক | জনপ্রতি অর্থ: ${BanglaFormatter.formatCurrency(r.allocatedTaka / r.count)}');
       }
       buffer.writeln('   আইনি কারণ: ${r.legalReason}\n');
     }
     buffer.writeln('অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
+    return buffer.toString();
+  }
 
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
+  void _copyReport() {
+    Clipboard.setData(ClipboardData(text: _buildReportText()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('হিন্দু উত্তরাধিকার রিপোর্ট কপি করা হয়েছে!')));
+  }
+
+  Future<void> _saveToHistory() async {
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'hindu_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'হিন্দু উত্তরাধিকার বণ্টন (${_estateDecCtrl.text} শতক)',
+        category: 'ফারায়েজ',
+        timestamp: DateTime.now(),
+        inputSummary: 'পুত্র: $_sonsCount, স্ত্রী: $_widowCount, অবিবাহিতা কন্যা: $_unmarriedDaughterCount',
+        resultSummary: _results.isEmpty ? 'ওয়ারিশ নেই' : _results.map((r) => '${r.title}: ${BanglaFormatter.formatNumber(r.allocatedDecimal, fractionDigits: 2)} শতক').join(' | '),
+        fullReportBangla: _buildReportText(),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('বণ্টন রিপোর্ট ইতিহাসে সেভ করা হয়েছে'), backgroundColor: AppColors.primaryGreen),
+    );
   }
 
   @override
@@ -159,6 +206,7 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
       appBar: AppBar(
         title: const Text('উত্তরাধিকার (হিন্দু দায়ভাগ আইন)'),
         actions: [
+          IconButton(icon: const Icon(Icons.bookmark_add_outlined), tooltip: 'ইতিহাসে সেভ', onPressed: _saveToHistory),
           IconButton(icon: const Icon(Icons.copy), tooltip: 'কপি', onPressed: _copyReport),
         ],
       ),
@@ -214,6 +262,20 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
             const SizedBox(height: 14),
 
             // Distribution Results
+            if (_results.isEmpty)
+              Card(
+                color: Colors.amber.shade50,
+                child: const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Color(0xFFB45309)),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('কমপক্ষে একজন জীবিত ওয়ারিশের সংখ্যা ১ বা তার বেশি নির্ধারণ করুন।')),
+                    ],
+                  ),
+                ),
+              ),
             ..._results.map((r) {
               return Card(
                 color: AppColors.primaryGreenLight,
@@ -234,9 +296,11 @@ class _HinduInheritanceScreenState extends State<HinduInheritanceScreen> {
                       ),
                       const Divider(height: 14),
                       if (r.count > 1)
-                        Text('জনপ্রতি জমি: ${BanglaFormatter.formatNumber(r.allocatedDecimal / r.count, fractionDigits: 3)} শতক',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text('নগদ অর্থ: ${BanglaFormatter.formatCurrency(r.allocatedTaka)}'),
+                        Text(
+                          'জনপ্রতি জমি: ${BanglaFormatter.formatNumber(r.allocatedDecimal / r.count, fractionDigits: 3)} শতক | জনপ্রতি অর্থ: ${BanglaFormatter.formatCurrency(r.allocatedTaka / r.count)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      Text('মোট নগদ অর্থ: ${BanglaFormatter.formatCurrency(r.allocatedTaka)}'),
                       const SizedBox(height: 6),
                       Text('আইনি দলীল: ${r.legalReason}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     ],

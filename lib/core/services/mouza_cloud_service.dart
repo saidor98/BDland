@@ -48,6 +48,40 @@ class MouzaCloudItem {
       driveIndex: driveIndex,
     );
   }
+
+  bool get isPdf =>
+      (mimeType?.toLowerCase().contains('pdf') ?? false) ||
+      name.toLowerCase().endsWith('.pdf');
+
+  bool get isImage =>
+      name.toLowerCase().endsWith('.jpg') ||
+      name.toLowerCase().endsWith('.jpeg') ||
+      name.toLowerCase().endsWith('.png') ||
+      name.toLowerCase().endsWith('.webp');
+
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'isFolder': isFolder,
+        'id': id,
+        'mimeType': mimeType,
+        'size': size,
+        'downloadUrl': downloadUrl,
+        'path': path,
+        'driveIndex': driveIndex,
+      };
+
+  factory MouzaCloudItem.fromMap(Map<String, dynamic> map) {
+    return MouzaCloudItem(
+      name: map['name'] as String? ?? 'অজানা ফাইল',
+      isFolder: map['isFolder'] as bool? ?? false,
+      id: map['id'] as String?,
+      mimeType: map['mimeType'] as String?,
+      size: map['size'] as int?,
+      downloadUrl: map['downloadUrl'] as String?,
+      path: map['path'] as String? ?? '',
+      driveIndex: map['driveIndex'] as int? ?? 0,
+    );
+  }
 }
 
 class MouzaCloudService {
@@ -71,7 +105,7 @@ class MouzaCloudService {
   /// Bundled authentic high-resolution Cadastral sheets (Offline Ready in App Assets)
   static const List<Map<String, String>> bundledMaps = [
     {
-      'title': 'তেজগাঁও - তেজকুনিপাড়া (শীট ১)',
+      'title': 'তেজগাঁও - তেজকুনিপাড়া (শীট ১ PDF)',
       'asset': 'assets/mouza_maps/SA_Tejgaon_Tejkunipara_Sheet1.pdf',
       'survey': 'SA',
       'district': 'ঢাকা',
@@ -82,7 +116,7 @@ class MouzaCloudService {
       'size': '১৩.৪ MB',
     },
     {
-      'title': 'তেজগাঁও - কাওরান বাজার (শীট ১)',
+      'title': 'তেজগাঁও - কাওরান বাজার (শীট ১ PDF)',
       'asset': 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf',
       'survey': 'SA',
       'district': 'ঢাকা',
@@ -93,15 +127,26 @@ class MouzaCloudService {
       'size': '৮.৯ MB',
     },
     {
-      'title': 'সোনারগাঁও - আমিনপুর (শীট ১)',
-      'asset': 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf',
+      'title': 'তেজকুনিপাড়া - হাই-রেজোলিউশন স্ক্যান (JPG)',
+      'asset': 'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+      'survey': 'SA',
+      'district': 'ঢাকা',
+      'upazila': 'তেজগাঁও',
+      'mouza': 'তেজকুনিপাড়া',
+      'jlNo': '৮৯',
+      'sheetNo': '১',
+      'size': '৫.৪ MB',
+    },
+    {
+      'title': 'সোনারগাঁও - আমিনপুর নমুনা স্ক্যান (JPG)',
+      'asset': 'assets/mouza_maps/sample_mouza_sheet_2.jpg',
       'survey': 'CS / RS',
       'district': 'নারায়ণগঞ্জ',
       'upazila': 'সোনারগাঁ',
       'mouza': 'আমিনপুর',
       'jlNo': '৩৪',
       'sheetNo': '১',
-      'size': '৮.৯ MB',
+      'size': '১৭.০ MB',
     },
   ];
 
@@ -116,7 +161,9 @@ class MouzaCloudService {
     client.badCertificateCallback = (cert, host, port) => true;
 
     try {
-      final uri = Uri.parse(downloadUrl.startsWith('http') ? downloadUrl : '$baseUrl$downloadUrl');
+      final uri = (downloadUrl.startsWith('http://') || downloadUrl.startsWith('https://'))
+          ? Uri.parse(downloadUrl)
+          : Uri.parse('$baseUrl/').resolve(downloadUrl);
       final request = await client.getUrl(uri);
       request.headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0');
 
@@ -343,13 +390,12 @@ class MouzaCloudService {
       ];
     }
 
-    // Inside Survey Type -> Return Mouza Map PDF Sheets
+    // Inside Survey Type -> Return offline bundled Cadastral sheets
     return [
-      _createFile('১০-আমিনপুর-শীট-১ (www.mouzamap.tech).pdf', driveIndex, cleanPath, 9614270),
-      _createFile('১০-আমিনপুর-শীট-২ (www.mouzamap.tech).pdf', driveIndex, cleanPath, 10150273),
-      _createFile('১০-আমিনপুর-শীট-৩ (www.mouzamap.tech).pdf', driveIndex, cleanPath, 8345210),
-      _createFile('১২-জাফরাবাদ-শীট-১ (www.mouzamap.tech).pdf', driveIndex, cleanPath, 11024500),
-      _createFile('১৫-রূপগঞ্জ-শীট-১ (www.mouzamap.tech).pdf', driveIndex, cleanPath, 7845488),
+      _createOfflineAsset('তেজকুনিপাড়া-SA-শীট-১ (অফলাইন PDF)', driveIndex, cleanPath, 13378007, 'assets/mouza_maps/SA_Tejgaon_Tejkunipara_Sheet1.pdf', 'application/pdf'),
+      _createOfflineAsset('কাওরান-SA-শীট-১ (অফলাইন PDF)', driveIndex, cleanPath, 8921389, 'assets/mouza_maps/SA_Tejgaon_Kawran_Sheet1.pdf', 'application/pdf'),
+      _createOfflineAsset('নমুনা-ক্যাডাস্ট্রাল-স্ক্যান-১ (অফলাইন JPG)', driveIndex, cleanPath, 5408419, 'assets/mouza_maps/sample_mouza_sheet_1.jpg', 'image/jpeg'),
+      _createOfflineAsset('নমুনা-ক্যাডাস্ট্রাল-স্ক্যান-২ (অফলাইন JPG)', driveIndex, cleanPath, 17056265, 'assets/mouza_maps/sample_mouza_sheet_2.jpg', 'image/jpeg'),
     ];
   }
 
@@ -364,14 +410,21 @@ class MouzaCloudService {
     );
   }
 
-  static MouzaCloudItem _createFile(String name, int driveIndex, String currentPath, int size) {
+  static MouzaCloudItem _createOfflineAsset(
+    String name,
+    int driveIndex,
+    String currentPath,
+    int size,
+    String assetPath,
+    String mimeType,
+  ) {
     final subPath = '$currentPath/$name';
     return MouzaCloudItem(
       name: name,
       isFolder: false,
-      mimeType: 'application/pdf',
+      mimeType: mimeType,
       size: size,
-      downloadUrl: '$baseUrl/$driveIndex:/$subPath',
+      downloadUrl: assetPath,
       path: subPath,
       driveIndex: driveIndex,
     );

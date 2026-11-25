@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/pdf_report_helper.dart';
 import '../../../core/services/mouza_cloud_service.dart';
 import '../02_mouza_simple/mouza_map_simple_screen.dart';
 import '../widgets/digital_gunia_scale.dart';
+import '../widgets/mouza_sheet_image.dart';
 
 class MouzaDirectoryItem {
   final String division;
@@ -104,9 +108,12 @@ class AllMouzaMapsScreen extends StatefulWidget {
 }
 
 class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
-  // Page 3 Tab & Source States
+  static const String _favPrefKey = 'favorite_mouza_maps_v1';
+  static const String _savedPrefKey = 'saved_mouza_maps_v1';
+
+  // Tab & Source States
   int _activeTopTab = 0; // 0: সকল ম্যাপ, 1: প্রিয় ম্যাপ, 2: সেভ ম্যাপ
-  int _activeSource = 1; // 1: সোর্স ১ (free.mouzamap.tech), 2: সোর্স ২, 3: সোর্স ৩
+  int _activeSource = 1; // 1: অনলাইন আর্কাইভ, 2: অফলাইন বান্ডেল্ড, 3: সেভ ও প্রিয়
 
   int _selectedDriveIndex = 0; // 0: Dhaka
   String _currentDivisionName = 'ঢাকা';
@@ -115,6 +122,8 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
 
   bool _isLoading = false;
   List<MouzaCloudItem> _cloudItems = [];
+  List<MouzaCloudItem> _favoriteItems = [];
+  List<MouzaCloudItem> _savedItems = [];
   String _searchQuery = '';
 
   final MouzaCloudService _cloudService = MouzaCloudService();
@@ -122,7 +131,68 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSavedCollections();
     _loadDirectory();
+  }
+
+  Future<void> _loadSavedCollections() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final favRaw = prefs.getStringList(_favPrefKey) ?? const [];
+      final savedRaw = prefs.getStringList(_savedPrefKey) ?? const [];
+      if (mounted) {
+        setState(() {
+          _favoriteItems = favRaw
+              .map((s) => MouzaCloudItem.fromMap(json.decode(s) as Map<String, dynamic>))
+              .toList();
+          _savedItems = savedRaw
+              .map((s) => MouzaCloudItem.fromMap(json.decode(s) as Map<String, dynamic>))
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFavorite(MouzaCloudItem item) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      final idx = _favoriteItems.indexWhere((e) => e.path == item.path && e.name == item.name);
+      if (idx >= 0) {
+        _favoriteItems.removeAt(idx);
+      } else {
+        _favoriteItems.insert(0, item);
+      }
+    });
+    await prefs.setStringList(
+      _favPrefKey,
+      _favoriteItems.map((e) => json.encode(e.toMap())).toList(),
+    );
+  }
+
+  bool _isFavorite(MouzaCloudItem item) {
+    return _favoriteItems.any((e) => e.path == item.path && e.name == item.name);
+  }
+
+  Future<void> _recordSavedItem(MouzaCloudItem item, String localPath) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEntry = MouzaCloudItem(
+      name: item.name,
+      isFolder: false,
+      id: item.id,
+      mimeType: item.mimeType,
+      size: item.size,
+      downloadUrl: localPath,
+      path: item.path,
+      driveIndex: item.driveIndex,
+    );
+    setState(() {
+      _savedItems.removeWhere((e) => e.name == savedEntry.name && e.path == savedEntry.path);
+      _savedItems.insert(0, savedEntry);
+    });
+    await prefs.setStringList(
+      _savedPrefKey,
+      _savedItems.map((e) => json.encode(e.toMap())).toList(),
+    );
   }
 
   Future<void> _loadDirectory() async {
@@ -209,7 +279,38 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _CadastralSheetModal(item: item, cloudItem: cloudItem),
+      builder: (ctx) => _CadastralSheetModal(
+        item: item,
+        cloudItem: cloudItem,
+        onSavedOffline: (savedItem, localPath) => _recordSavedItem(savedItem, localPath),
+      ),
+    );
+  }
+
+  void _showGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.menu_book, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('মৌজা ম্যাপ ব্যবহারের ধাপসমূহ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Text(
+            '১. বিভাগ ও জেলা/উপজেলা নির্বাচন করে আপনার কাঙ্ক্ষিত মৌজার মূল PDF বা JPG শিট খুলুন।\n'
+            '২. ভিউয়ারে মূল নকশা জুম করে দেখুন এবং "নকশায় মাপুন" বাটনে ক্লিক করে স্কেল (১৬"/৩২"/৬৪"/৮০") অনুযায়ী সরাসরি প্লট মাপুন।\n'
+            '৩. অফলাইনে রাখতে "নকশা ডাউনলোড" চাপুন—ফাইলটি সেভ ম্যাপ ট্যাবে যুক্ত হয়ে যাবে।\n'
+            '৪. "নকশায় জমি মাপুন" চেপে CAD ক্যানভাসে আসল নকশার ওপর বিন্দু বসিয়ে শতক-কাঠা, বণ্টন ও DXF/KML তৈরি করুন।',
+            style: TextStyle(fontSize: 13, height: 1.45),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি')),
+        ],
+      ),
     );
   }
 
@@ -238,15 +339,19 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredItems = _cloudItems.where((item) {
+    final List<MouzaCloudItem> activeSourceItems = _activeTopTab == 1
+        ? _favoriteItems
+        : (_activeTopTab == 2 ? _savedItems : _cloudItems);
+
+    final filteredItems = activeSourceItems.where((item) {
       if (_searchQuery.isEmpty) return true;
       return item.name.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Deep dark theme matching Page 3
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6B21A8), // Purple header matching Page 3
+        backgroundColor: const Color(0xFF6B21A8),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -268,32 +373,19 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline, color: Colors.white),
-            tooltip: 'সাহায্য',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('মৌজা ম্যাপ সংগ্রহ ও ব্যবহার'),
-                  content: const Text('১. আপনার বিভাগ নির্বাচন করুন।\n২. জেলা ও উপজেলা ফোল্ডারে প্রবেশ করে আপনার কাঙ্ক্ষিত মৌজা শিট নির্বাচন করুন।\n৩. "নকশায় জমি মাপুন" বাটনে চাপ দিয়ে সরাসরি CAD পরিমাপে যান।'),
-                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি'))],
-                ),
-              );
-            },
+            tooltip: 'ব্যবহারবিধি',
+            onPressed: _showGuideDialog,
           ),
           IconButton(
-            icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent),
-            tooltip: 'ভিডিও গাইড',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('মৌজা ম্যাপ ব্যবহারের পূর্ণাঙ্গ ভিডিও টিউটোরিয়াল চালু হচ্ছে...')),
-              );
-            },
+            icon: const Icon(Icons.menu_book_outlined, color: Colors.amberAccent),
+            tooltip: 'সম্পূর্ণ নির্দেশিকা',
+            onPressed: _showGuideDialog,
           ),
         ],
       ),
       body: Column(
         children: [
-          // 1. TOP TABS: সকল ম্যাপ | প্রিয় ম্যাপ | সেভ ম্যাপ (Matching Page 3)
+          // 1. TOP TABS: সকল ম্যাপ | প্রিয় ম্যাপ | সেভ ম্যাপ
           Container(
             color: const Color(0xFF6B21A8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -301,24 +393,24 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
               children: [
                 _buildTopTabItem(0, 'সকল ম্যাপ', Icons.folder_copy_outlined),
                 const SizedBox(width: 8),
-                _buildTopTabItem(1, 'প্রিয় ম্যাপ', Icons.favorite_border),
+                _buildTopTabItem(1, 'প্রিয় (${BanglaNumerals.toBangla(_favoriteItems.length)})', Icons.favorite_border),
                 const SizedBox(width: 8),
-                _buildTopTabItem(2, 'সেভ ম্যাপ', Icons.bookmark_border),
+                _buildTopTabItem(2, 'সেভ (${BanglaNumerals.toBangla(_savedItems.length)})', Icons.bookmark_border),
               ],
             ),
           ),
 
-          // 2. SOURCE PILLS: সোর্স ১ | সোর্স ২ | সোর্স ৩ (Matching Page 3)
+          // 2. SOURCE PILLS: ক্লাউড | অফলাইন বান্ডেল্ড | প্রিয়/সেভড
           Container(
             color: const Color(0xFF1E1B4B),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                _buildSourcePill(1, 'সোর্স ১', Icons.auto_stories),
+                _buildSourcePill(1, 'ক্লাউড আর্কাইভ', Icons.cloud_outlined),
                 const SizedBox(width: 8),
-                _buildSourcePill(2, 'সোর্স ২', Icons.cloud_outlined),
+                _buildSourcePill(2, 'অফলাইন বান্ডেল্ড', Icons.offline_pin),
                 const SizedBox(width: 8),
-                _buildSourcePill(3, 'সোর্স ৩', Icons.public),
+                _buildSourcePill(3, 'সংরক্ষিত ফাইল', Icons.bookmark_added),
               ],
             ),
           ),
@@ -327,129 +419,164 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(14),
               children: [
-                // OFFLINE BUNDLED MAPS SECTION (Free.mouzamap.tech high-res scanned sheets)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF334155)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0x4D0F5A38),
-                              borderRadius: BorderRadius.circular(8),
+                // OFFLINE BUNDLED MAPS SECTION (Show on Tab 0 or Source 2)
+                if (_activeTopTab == 0)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0x4D0F5A38),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.offline_pin, color: Color(0xFF4ADE80), size: 18),
                             ),
-                            child: const Icon(Icons.offline_pin, color: Color(0xFF4ADE80), size: 18),
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'অফলাইনে সংরক্ষিত আসল মৌজা শিট',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'অফলাইনে সংরক্ষিত আসল মৌজা শিট',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF14532D),
-                              borderRadius: BorderRadius.circular(6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF14532D),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'অফলাইন রেডি',
+                                style: TextStyle(color: Color(0xFF86EFAC), fontSize: 10.5, fontWeight: FontWeight.bold),
+                              ),
                             ),
-                            child: const Text(
-                              'ফুল HD স্ক্যান',
-                              style: TextStyle(color: Color(0xFF86EFAC), fontSize: 10.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ...MouzaCloudService.bundledMaps.map((mapInfo) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...MouzaCloudService.bundledMaps.map((mapInfo) {
+                          final assetPath = mapInfo['asset'] ?? '';
+                          final isPdf = assetPath.toLowerCase().endsWith('.pdf');
+                          return InkWell(
+                            onTap: () {
+                              final item = MouzaDirectoryItem(
+                                division: 'ঢাকা',
+                                district: mapInfo['district'] ?? 'ঢাকা',
+                                upazila: mapInfo['upazila'] ?? 'তেজগাঁও',
+                                mouzaName: mapInfo['mouza'] ?? 'মৌজা',
+                                jlNo: mapInfo['jlNo'] ?? '১',
+                                surveyType: mapInfo['survey'] ?? 'SA',
+                                totalSheets: 1,
+                                totalPlots: 800,
+                              );
+                              final cloudItem = MouzaCloudItem(
+                                name: mapInfo['title'] ?? 'মৌজা শিট',
+                                isFolder: false,
+                                mimeType: isPdf ? 'application/pdf' : 'image/jpeg',
+                                downloadUrl: assetPath,
+                                path: assetPath,
+                                driveIndex: 0,
+                              );
+                              _openCadastralViewer(item, cloudItem: cloudItem);
+                            },
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF334155)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 28),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      mapInfo['title'] ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${mapInfo['district']} • ${mapInfo['survey']} • সাইজ: ${mapInfo['size']}',
-                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                                    ),
-                                  ],
-                                ),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF334155)),
                               ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => MouzaMapSimpleScreen(
-                                        initialMouzaName: mapInfo['mouza'] ?? 'আমিনপুর',
-                                        initialSheetNo: 'শিট ${mapInfo['sheetNo'] ?? '১'}',
-                                        initialJlNo: mapInfo['jlNo'] ?? '৩৪',
-                                        initialPoints: const [
-                                          Offset(60, 60),
-                                          Offset(260, 60),
-                                          Offset(280, 220),
-                                          Offset(40, 200),
-                                        ],
-                                      ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isPdf ? Icons.picture_as_pdf : Icons.image,
+                                    color: isPdf ? const Color(0xFFEF4444) : const Color(0xFF38BDF8),
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          mapInfo['title'] ?? '',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${mapInfo['district']} • ${mapInfo['survey']} • সাইজ: ${mapInfo['size']}',
+                                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                        ),
+                                      ],
                                     ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0F5A38),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.straighten, size: 14),
-                                    SizedBox(width: 4),
-                                    Text('মাপুন', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => MouzaMapSimpleScreen(
+                                            initialMouzaName: mapInfo['mouza'] ?? 'আমিনপুর',
+                                            initialSheetNo: 'শিট ${mapInfo['sheetNo'] ?? '১'}',
+                                            initialJlNo: mapInfo['jlNo'] ?? '৩৪',
+                                            initialImageUrl: assetPath,
+                                            initialPoints: const [
+                                              Offset(60, 60),
+                                              Offset(260, 60),
+                                              Offset(280, 220),
+                                              Offset(40, 200),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0F5A38),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.straighten, size: 14),
+                                        SizedBox(width: 4),
+                                        Text('মাপুন', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
                   ),
-                ),
+
+                // Show divisions/search/directory when on Tab 0 and online/archive source
+                if (_activeTopTab == 0 && _activeSource != 2) ...[
 
                 // 3. SECTION: আপনার বিভাগ নির্বাচন করুন (Page 3)
                 const Text(
@@ -586,19 +713,32 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                 ),
 
                 const SizedBox(height: 10),
+                ],
 
-                // 6. FOLDER & FILE LIST (Page 3)
+                // 6. FOLDER & FILE LIST
+                if (_activeTopTab != 0 || _activeSource != 2) ...[
                 if (filteredItems.isEmpty && !_isLoading)
                   Container(
                     padding: const EdgeInsets.all(24),
                     child: Center(
                       child: Column(
                         children: [
-                          const Icon(Icons.folder_open, size: 48, color: Color(0xFF475569)),
+                          Icon(
+                            _activeTopTab == 1
+                                ? Icons.favorite_border
+                                : (_activeTopTab == 2 ? Icons.bookmark_border : Icons.folder_open),
+                            size: 48,
+                            color: const Color(0xFF475569),
+                          ),
                           const SizedBox(height: 8),
                           Text(
-                            _searchQuery.isEmpty ? 'এই ফোল্ডারে কোনো ফাইল নেই' : 'কোনো ফলাফল পাওয়া যায়নি',
+                            _activeTopTab == 1
+                                ? 'এখনো কোনো প্রিয় মৌজা ম্যাপ যোগ করা হয়নি'
+                                : (_activeTopTab == 2
+                                    ? 'এখনো কোনো মৌজা ম্যাপ অফলাইনে ডাউনলোড করা হয়নি'
+                                    : (_searchQuery.isEmpty ? 'এই ফোল্ডারে কোনো ফাইল নেই' : 'কোনো ফলাফল পাওয়া যায়নি')),
                             style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
@@ -612,6 +752,13 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, idx) {
                       final item = filteredItems[idx];
+                      final isFav = _isFavorite(item);
+                      final isPdf = item.isPdf;
+                      final sizeText = item.size != null
+                          ? '${(item.size! / (1024 * 1024)).toStringAsFixed(1)} MB'
+                          : (isPdf ? 'PDF নকশা' : 'স্ক্যান ইমেজ');
+                      final typeLabel = isPdf ? 'PDF ক্যাডাস্ট্রাল নকশা' : 'অরিজিনাল স্ক্যান নকশা';
+
                       return Material(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(12),
@@ -622,19 +769,23 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             child: Row(
                               children: [
-                                // Folder / PDF Icon
+                                // Folder / PDF / Image Icon
                                 Container(
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
                                     color: item.isFolder
                                         ? const Color(0x4D6B21A8)
-                                        : const Color(0x33DC2626),
+                                        : (isPdf ? const Color(0x33DC2626) : const Color(0x330284C7)),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(
-                                    item.isFolder ? Icons.folder : Icons.picture_as_pdf,
-                                    color: item.isFolder ? const Color(0xFFA855F7) : const Color(0xFFEF4444),
+                                    item.isFolder
+                                        ? Icons.folder
+                                        : (isPdf ? Icons.picture_as_pdf : Icons.image),
+                                    color: item.isFolder
+                                        ? const Color(0xFFA855F7)
+                                        : (isPdf ? const Color(0xFFEF4444) : const Color(0xFF38BDF8)),
                                     size: 22,
                                   ),
                                 ),
@@ -654,13 +805,23 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                                       const SizedBox(height: 2),
                                       Text(
                                         item.isFolder
-                                            ? '১৩ সেপ্টেম্বর ২০২৫ • ডিরেক্টরি'
-                                            : '${item.size != null ? "${(item.size! / (1024 * 1024)).toStringAsFixed(1)} MB" : "PDF নকশা"} • ক্যাডাস্ট্রাল ভেক্টর',
-                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                            ? 'ফোল্ডার • ক্লিক করে ভিতরে যান'
+                                            : '$sizeText • $typeLabel',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                                       ),
                                     ],
                                   ),
                                 ),
+                                if (!item.isFolder)
+                                  IconButton(
+                                    icon: Icon(
+                                      isFav ? Icons.favorite : Icons.favorite_border,
+                                      size: 19,
+                                      color: isFav ? const Color(0xFFF43F5E) : const Color(0xFF64748B),
+                                    ),
+                                    tooltip: isFav ? 'প্রিয় থেকে সরান' : 'প্রিয় তালিকায় রাখুন',
+                                    onPressed: () => _toggleFavorite(item),
+                                  ),
                                 const Icon(
                                   Icons.arrow_forward_ios,
                                   size: 14,
@@ -673,6 +834,9 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                       );
                     },
                   ),
+                ],
+                if (_activeTopTab == 0 && _activeSource != 2)
+                  const SizedBox.shrink(),
               ],
             ),
           ),
@@ -685,7 +849,11 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
     final isSel = _activeTopTab == index;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _activeTopTab = index),
+        onTap: () => setState(() {
+          _activeTopTab = index;
+          if (index == 0 && _activeSource == 3) _activeSource = 1;
+          if (index == 2) _activeSource = 3;
+        }),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -698,12 +866,15 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
             children: [
               Icon(icon, size: 15, color: isSel ? Colors.white : Colors.white70),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                  color: isSel ? Colors.white : Colors.white70,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    color: isSel ? Colors.white : Colors.white70,
+                  ),
                 ),
               ),
             ],
@@ -718,8 +889,17 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
     return Expanded(
       child: InkWell(
         onTap: () {
-          setState(() => _activeSource = sourceNum);
-          _loadDirectory();
+          setState(() {
+            _activeSource = sourceNum;
+            if (sourceNum == 1) {
+              _activeTopTab = 0;
+              _loadDirectory();
+            } else if (sourceNum == 2) {
+              _activeTopTab = 0;
+            } else if (sourceNum == 3) {
+              _activeTopTab = 2;
+            }
+          });
         },
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -734,12 +914,15 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
             children: [
               Icon(icon, size: 14, color: isSel ? Colors.white : const Color(0xFF94A3B8)),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                  color: isSel ? Colors.white : const Color(0xFF94A3B8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                  ),
                 ),
               ),
             ],
@@ -753,10 +936,12 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
 class _CadastralSheetModal extends StatefulWidget {
   final MouzaDirectoryItem item;
   final MouzaCloudItem? cloudItem;
+  final void Function(MouzaCloudItem item, String localPath)? onSavedOffline;
 
   const _CadastralSheetModal({
     required this.item,
     this.cloudItem,
+    this.onSavedOffline,
   });
 
   @override
@@ -776,7 +961,6 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   String? _downloadedFilePath;
-  int _imageKey = 0; // for force reload
 
   int _selectedPlotIndex = 4; // Default to Dag 105 (Area: 33,000 sq ft, 75.758 dec)
   String? _selectedDagInfo = 'দাগ ১০৫ নির্বাচিত | খতিয়ান নং: ১২ | আনুমানিক: ৭৫.৭৫৮ শতক (৩৩,০০০ sq ft)';
@@ -878,8 +1062,19 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   }
 
   Future<void> _downloadMouzaMapFile() async {
-    if (widget.cloudItem?.downloadUrl == null) {
+    final url = widget.cloudItem?.downloadUrl;
+    if (url == null) {
       _downloadMapPdf();
+      return;
+    }
+    if (url.startsWith('assets/')) {
+      widget.onSavedOffline?.call(widget.cloudItem!, url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('অফলাইন বান্ডেল্ড নকশাটি সেভ ম্যাপ তালিকায় সংরক্ষণ করা হয়েছে!'),
+          backgroundColor: AppColors.primaryGreen,
+        ),
+      );
       return;
     }
 
@@ -890,7 +1085,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
 
     try {
       final path = await MouzaCloudService().downloadMouzaFile(
-        downloadUrl: widget.cloudItem!.downloadUrl!,
+        downloadUrl: url,
         fileName: widget.cloudItem!.name,
         onProgress: (p) {
           if (mounted) setState(() => _downloadProgress = p);
@@ -904,9 +1099,10 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
         });
 
         if (path != null) {
+          widget.onSavedOffline?.call(widget.cloudItem!, path);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('নকশা ডাউনলোড সম্পন্ন হয়েছে!\nসংরক্ষিত: $path'),
+              content: Text('নকশা ডাউনলোড সম্পন্ন হয়েছে ও সেভ তালিকায় যুক্ত হয়েছে!\nসংরক্ষিত: $path'),
               backgroundColor: AppColors.primaryGreen,
               duration: const Duration(seconds: 4),
             ),
@@ -914,7 +1110,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ডাউনলোড সম্পন্ন হয়নি। সরাসরি ব্রাউজারে লিংক ওপেন করুন।'),
+              content: Text('ডাউনলোড সম্পন্ন হয়নি। নেটওয়ার্ক সংযোগ যাচাই করে পুনরায় চেষ্টা করুন।'),
               backgroundColor: AppColors.accentCrimson,
             ),
           );
@@ -928,7 +1124,8 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
   }
 
   void _downloadMapPdf() async {
-    final pdf = pw.Document();
+    final bengaliTheme = await PdfReportHelper.loadBengaliTheme();
+    final pdf = pw.Document(theme: bengaliTheme);
 
     pdf.addPage(
       pw.Page(
@@ -962,7 +1159,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                 ),
               ),
               pw.SizedBox(height: 8),
-              pw.Text('বিডি ল্যান্ড প্রো - বাংলাদেশ ভূমি জরিপ ও মৌজা ডিজিটাল আর্কাইভ (mouzamap.tech সমমানের ওপেন প্ল্যাটফর্ম)'),
+              pw.Text('বিডি ল্যান্ড প্রো - বাংলাদেশ ভূমি জরিপ ও মৌজা ডিজিটাল আর্কাইভ (free.mouzamap.tech)'),
             ],
           );
         },
@@ -1238,75 +1435,11 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                                   ),
                                 ],
                               ),
-                              child: (widget.cloudItem?.downloadUrl != null && widget.cloudItem!.downloadUrl!.startsWith('http'))
-                                  ? Image.network(
-                                      widget.cloudItem!.downloadUrl!,
-                                      key: ValueKey('mouza_img_${widget.cloudItem!.name}_$_imageKey'),
-                                      fit: BoxFit.contain,
-                                      headers: const {
-                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BDLandPro/1.0',
-                                      },
-                                      loadingBuilder: (ctx, child, progress) {
-                                        if (progress == null) return child;
-                                        final total = progress.expectedTotalBytes;
-                                        final loaded = progress.cumulativeBytesLoaded;
-                                        final pct = total != null && total > 0 ? (loaded / total * 100).toStringAsFixed(0) : '';
-
-                                        return Container(
-                                          width: 480,
-                                          height: 520,
-                                          color: const Color(0xFFFAF6EE),
-                                          child: Center(
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const CircularProgressIndicator(color: AppColors.primaryGreen),
-                                                const SizedBox(height: 16),
-                                                Text(
-                                                  'অরিজিনাল মৌজা নকশা লোড হচ্ছে... ${pct.isNotEmpty ? '$pct%' : ''}',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  '${(loaded / 1048576).toStringAsFixed(1)} MB'
-                                                  '${total != null ? ' / ${(total / 1048576).toStringAsFixed(1)} MB' : ''}',
-                                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      errorBuilder: (ctx, err, stack) {
-                                        return Stack(
-                                          children: [
-                                            Image.asset(
-                                              'assets/mouza_maps/sample_mouza_sheet_1.jpg',
-                                              fit: BoxFit.contain,
-                                            ),
-                                            Positioned(
-                                              top: 8,
-                                              right: 8,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xCC0F172A),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Text(
-                                                  'অফলাইন ক্যাডাস্ট্রাল এইচডি স্ক্যান',
-                                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    )
-                                  : Image.asset(
-                                      'assets/mouza_maps/sample_mouza_sheet_1.jpg',
-                                      fit: BoxFit.contain,
-                                    ),
+                              child: MouzaSheetImage(
+                                source: _downloadedFilePath ?? widget.cloudItem!.downloadUrl!,
+                                fit: BoxFit.contain,
+                                pdfPageIndex: _selectedSheetIndex - 1,
+                              ),
                             ),
 
                             // On-sheet Custom Measurement Overlay
@@ -1560,6 +1693,7 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      final sheetSource = _downloadedFilePath ?? widget.cloudItem?.downloadUrl;
                       Navigator.pop(context);
                       Navigator.push(
                         context,
@@ -1568,8 +1702,10 @@ class _CadastralSheetModalState extends State<_CadastralSheetModal> {
                             initialMouzaName: widget.item.mouzaName,
                             initialSheetNo: 'শিট ${BanglaNumerals.toBangla(_selectedSheetIndex)}',
                             initialJlNo: widget.item.jlNo,
-                            initialPoints: _getNormalizedCadPoints(),
-                            initialImageUrl: widget.cloudItem?.downloadUrl ?? 'assets/mouza_maps/sample_mouza_sheet_1.jpg',
+                            initialPoints: _sheetMeasurePoints.length >= 3
+                                ? List<Offset>.from(_sheetMeasurePoints)
+                                : _getNormalizedCadPoints(),
+                            initialImageUrl: sheetSource,
                           ),
                         ),
                       );

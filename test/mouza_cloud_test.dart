@@ -93,5 +93,28 @@ void main() {
       }, 0, 'Dhaka');
       expect(itemAbsolute.downloadUrl, equals('https://custom-host.com/images/external.jpg'));
     });
+
+    test('MouzaCloudItem round-trips toMap/fromMap and detects PDF vs Image formats', () {
+      final pdfItem = MouzaCloudItem(
+        name: 'SA_Sheet_101.pdf',
+        isFolder: false,
+        mimeType: 'application/pdf',
+        size: 102400,
+        downloadUrl: 'https://free.mouzamap.tech/download.aspx?id=101',
+        path: 'Dhaka/Tejgaon',
+        driveIndex: 0,
+      );
+      expect(pdfItem.isPdf, isTrue);
+      expect(pdfItem.isImage, isFalse);
+
+      final restored = MouzaCloudItem.fromMap(pdfItem.toMap());
+      expect(restored.name, equals('SA_Sheet_101.pdf'));
+      expect(restored.downloadUrl, equals(pdfItem.downloadUrl));
+      expect(restored.isPdf, isTrue);
+
+      final jpgItem = MouzaCloudItem(name: 'sheet_102.JPG', isFolder: false);
+      expect(jpgItem.isImage, isTrue);
+      expect(jpgItem.isPdf, isFalse);
+    });
   });
 }

@@ -2,9 +2,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/polygon_geometry.dart';
 import '../../geometry/models/geometry_models.dart';
+import '../../geometry/screens/polygon_screen.dart';
 import '../../geometry/services/geometry_calculator.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class QuadMasterScreen extends StatefulWidget {
   const QuadMasterScreen({super.key});
@@ -258,6 +262,30 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     );
   }
 
+  Future<void> _saveToHistory() async {
+    final r = _result;
+    if (r == null || !r.isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('সঠিক চতুর্ভুজ মান দিয়ে হিসাব করুন'), backgroundColor: AppColors.errorRed),
+      );
+      return;
+    }
+    final item = CalculationHistoryItem(
+      id: 'quad_${DateTime.now().millisecondsSinceEpoch}',
+      title: 'QuadMaster চতুর্ভুজ (${BanglaFormatter.formatNumber(r.exactAreaDecimal, fractionDigits: 2)} শতক)',
+      category: 'জ্যামিতি',
+      timestamp: DateTime.now(),
+      inputSummary: 'উ: ${r.sideNorth}\', দ: ${r.sideSouth}\', পূ: ${r.sideEast}\', প: ${r.sideWest}\', কর্ণ: ${r.diagonal}\'',
+      resultSummary: '${BanglaFormatter.formatNumber(r.exactAreaDecimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(r.exactAreaSqFt)} sq ft)',
+      fullReportBangla: _generateReport(),
+    );
+    await HistoryService.instance.saveItem(item);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('হিসাব ইতিহাসে সংরক্ষণ করা হয়েছে'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = _result;
@@ -277,8 +305,8 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'চতুর্ভুজ পরিম...',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              'চতুর্ভুজ পরিমাপ ও বণ্টন',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
             ),
             Text(
               'QuadMaster Pro',
@@ -306,8 +334,10 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
             icon: const Icon(Icons.more_vert, color: Color(0xFF334155)),
             onSelected: (val) {
               if (val == 'copy') _copyReport();
+              if (val == 'save') _saveToHistory();
             },
             itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'save', child: Text('ইতিহাসে সেভ করুন')),
               PopupMenuItem(value: 'copy', child: Text('রিপোর্ট কপি করুন')),
             ],
           ),
@@ -336,15 +366,16 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
 
           const SizedBox(height: 12),
 
-          // 2. Extra sides button
+          // 2. Extra sides button -> PolygonScreen
           OutlinedButton.icon(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('বহুভুজ / অতিরিক্ত বাহু মোড চালু হয়েছে')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PolygonScreen()),
               );
             },
             icon: const Icon(Icons.straighten, size: 16, color: Color(0xFF2563EB)),
-            label: const Text('আরও ৪টি বাহুর মাপ দিন', style: TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
+            label: const Text('আরও ৪+ বাহু / বহুভুজ মাপুন', style: TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFBFDBFE)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -423,34 +454,25 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
                 BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
               ],
             ),
-            child: Stack(
-              children: [
-                CustomPaint(
-                  size: Size.infinite,
-                  painter: _QuadInteractivePainter(
-                    north: double.tryParse(_northCtrl.text) ?? 120,
-                    south: double.tryParse(_southCtrl.text) ?? 110,
-                    east: double.tryParse(_eastCtrl.text) ?? 80,
-                    west: double.tryParse(_westCtrl.text) ?? 85,
-                    diagX: double.tryParse(_diagXCtrl.text) ?? 145,
-                    showDiagX: _showDiagX,
-                    showDiagY: _showDiagY,
-                    showAngles: _showAngles,
-                    showSideNames: _showSideNames,
-                  ),
-                ),
-                // Corner labels A, B, C, D
-                const Positioned(top: 14, left: 24, child: Text('A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
-                const Positioned(top: 14, right: 24, child: Text('B', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
-                const Positioned(bottom: 14, right: 24, child: Text('C', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
-                const Positioned(bottom: 14, left: 24, child: Text('D', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)))),
-              ],
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _QuadInteractivePainter(
+                north: double.tryParse(_northCtrl.text) ?? 120,
+                south: double.tryParse(_southCtrl.text) ?? 110,
+                east: double.tryParse(_eastCtrl.text) ?? 80,
+                west: double.tryParse(_westCtrl.text) ?? 85,
+                diagX: double.tryParse(_diagXCtrl.text) ?? 145,
+                showDiagX: _showDiagX,
+                showDiagY: _showDiagY,
+                showAngles: _showAngles,
+                showSideNames: _showSideNames,
+              ),
             ),
           ),
 
           const SizedBox(height: 10),
 
-          // 6. BOTTOM CANVAS ACTION: মাপে ক্লিক করে এডিট করুন | [ফিট] (Page 2)
+          // 6. BOTTOM CANVAS ACTION
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -458,18 +480,13 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
                 children: [
                   Icon(Icons.edit_note, size: 18, color: Color(0xFF64748B)),
                   SizedBox(width: 6),
-                  Text('মাপে ক্লিক করে এডিট করুন', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  Text('প্রকৃত কোণ ও বাহু অনুযায়ী স্কেল করা', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ],
               ),
               ElevatedButton.icon(
                 onPressed: () {
                   _calculate();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('চতুর্ভুজ ক্যানভাসে স্বয়ংক্রিয়ভাবে ফিট করা হয়েছে'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
+                  setState(() {});
                 },
                 icon: const Icon(Icons.fullscreen, size: 14),
                 label: const Text('ফিট', style: TextStyle(fontSize: 12)),
@@ -485,115 +502,321 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
 
           const SizedBox(height: 16),
 
-          // 7. INPUT FIELDS SECTION: চার বাহুর পরিমাপ - ধাপ ১ (Page 2)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
+          if (r != null && !r.isValid)
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Row(
                 children: [
-                  Icon(Icons.edit, size: 16, color: Color(0xFF2563EB)),
-                  SizedBox(width: 6),
-                  Text('চার বাহুর পরিমাপ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                  const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      r.messageBangla.isNotEmpty
+                          ? r.messageBangla
+                          : 'অবাস্তব পরিমাপ! কর্ণের দৈর্ঘ্য ত্রিভুজীয় অসমতা নিয়ম মেনে চলেনি।',
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF991B1B), fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ],
               ),
-              Text('ধাপ ১', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // TIP CARD (Page 2)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
             ),
-            child: const Row(
+
+          if (_activeTab == 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.lightbulb_outline, color: Color(0xFF2563EB), size: 20),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'ফুট ও ইঞ্চিতে দশমিক ফরম্যাটে মান দিন। যেমন: ১২০.১১ মানে ১২০ ফুট ১১ ইঞ্চি।',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
+                const Row(
+                  children: [
+                    Icon(Icons.edit, size: 16, color: Color(0xFF2563EB)),
+                    SizedBox(width: 6),
+                    Text('চার বাহুর পরিমাপ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                  ],
+                ),
+                Text('ধাপ ১', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, color: Color(0xFF2563EB), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ফুট দশমিক ফরম্যাটে মান দিন। যেমন: ১২০.৫ মানে ১২০.৫ ফুট। কর্ণ AC সঠিকভাবে দিলে প্রকৃত আকার আঁকা হবে।',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
+                    ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Card(
+              color: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _buildInput(_northCtrl, 'উত্তর বাহু (ফুট)')),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInput(_southCtrl, 'দক্ষিণ বাহু (ফুট)')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _buildInput(_eastCtrl, 'পূর্ব বাহু (ফুট)')),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInput(_westCtrl, 'পশ্চিম বাহু (ফুট)')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInput(_diagXCtrl, 'কর্ণের দৈর্ঘ্য (AC কর্ণ ফুট)'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (r != null && r.isValid)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF14532D),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('হেরন্স ফর্মুলায় প্রকৃত জমি:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                        Row(
+                          children: [
+                            Text(
+                              '${BanglaFormatter.formatNumber(r.exactAreaDecimal, fractionDigits: 3)} শতক',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _saveToHistory,
+                              child: const Icon(Icons.bookmark_add_outlined, color: Colors.white, size: 20),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Colors.white24, height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('কাঠা: ${BanglaFormatter.formatNumber(r.exactAreaKatha, fractionDigits: 2)} কাঠা', style: const TextStyle(color: Colors.white)),
+                        Text('বর্গফুট: ${BanglaFormatter.formatNumber(r.exactAreaSqFt)} sq ft', style: const TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ] else if (_activeTab == 1 && r != null && r.isValid) ...[
+            _buildMethodComparisonTab(r),
+          ] else if (_activeTab == 2 && r != null && r.isValid) ...[
+            _buildAreaUnitsTab(r),
+          ] else if (_activeTab == 3 && r != null && r.isValid) ...[
+            _buildDivisionTab(r),
+          ],
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMethodComparisonTab(QuadrilateralResult r) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Card(
+          color: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('হেরন সূত্র (আইনসম্মত ২ ত্রিভুজ পদ্ধতি)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF14532D))),
+                const SizedBox(height: 10),
+                _buildCompRow('১ম ত্রিভুজ (উত্তর + পূর্ব + কর্ণ AC)', '${BanglaFormatter.formatNumber(r.triangle1AreaSqFt)} sq ft'),
+                _buildCompRow('২য় ত্রিভুজ (দক্ষিণ + পশ্চিম + কর্ণ AC)', '${BanglaFormatter.formatNumber(r.triangle2AreaSqFt)} sq ft'),
+                const Divider(),
+                _buildCompRow('প্রকৃত মোট ক্ষেত্রফল', '${BanglaFormatter.formatNumber(r.exactAreaDecimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(r.exactAreaSqFt)} sq ft)', isBold: true),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          color: const Color(0xFFFFFBEB),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFFDE68A))),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('আমিনের গড় পদ্ধতি বনাম প্রকৃত ফলাফল', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFB45309))),
+                const SizedBox(height: 10),
+                _buildCompRow('গড় পদ্ধতিতে ক্ষেত্রফল', '${BanglaFormatter.formatNumber(r.averageAreaDecimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(r.averageAreaSqFt)} sq ft)'),
+                _buildCompRow('ত্রুটির পরিমাণ', '${BanglaFormatter.formatNumber(r.diffDecimal.abs(), fractionDigits: 3)} শতক (${BanglaFormatter.formatPercentage(r.percentageError)})'),
+                const SizedBox(height: 6),
+                Text(
+                  r.percentageError > 0.5
+                      ? 'সতর্কতা: গড় পদ্ধতিতে জমি প্রকৃতের চেয়ে বেশি বা কম দেখাচ্ছে — দলিল ও বণ্টনে হেরন সূত্র ব্যবহার করুন।'
+                      : 'জমি প্রায় আয়তাকার হওয়ায় দুই পদ্ধতির পার্থক্য খুব সামান্য।',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF78350F)),
                 ),
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
 
-          const SizedBox(height: 14),
+  Widget _buildAreaUnitsTab(QuadrilateralResult r) {
+    final sqFt = r.exactAreaSqFt;
+    final dec = r.exactAreaDecimal;
+    final katha = r.exactAreaKatha;
+    final bigha = dec / 33.0;
+    final acre = dec / 100.0;
+    final sqMeter = sqFt * 0.092903;
+    final sqLink = sqFt * (1000.0 / 435.6);
 
-          // Input text fields (North, South, East, West, Diag)
-          Card(
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildInput(_northCtrl, 'উত্তর বাহু (ফুট)')),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInput(_southCtrl, 'দক্ষিণ বাহু (ফুট)')),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildInput(_eastCtrl, 'পূর্ব বাহু (ফুট)')),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInput(_westCtrl, 'পশ্চিম বাহু (ফুট)')),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildInput(_diagXCtrl, 'কর্ণের দৈর্ঘ্য (AC কর্ণ ফুট)'),
-                ],
-              ),
+    return Column(
+      children: [
+        Card(
+          color: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('সকল ভূমি এককে প্রকৃত ক্ষেত্রফল', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+                const SizedBox(height: 10),
+                _buildCompRow('শতাংশ / শতক', '${BanglaFormatter.formatNumber(dec, fractionDigits: 4)} শতক', isBold: true),
+                _buildCompRow('কাঠা (৭২০ বর্গফুট)', '${BanglaFormatter.formatNumber(katha, fractionDigits: 4)} কাঠা'),
+                _buildCompRow('বিঘা (৩৩ শতক)', '${BanglaFormatter.formatNumber(bigha, fractionDigits: 4)} বিঘা'),
+                _buildCompRow('একর (১০০ শতক)', '${BanglaFormatter.formatNumber(acre, fractionDigits: 4)} একর'),
+                _buildCompRow('বর্গফুট (sq ft)', '${BanglaFormatter.formatNumber(sqFt)} বর্গফুট'),
+                _buildCompRow('বর্গমিটার (m²)', '${BanglaFormatter.formatNumber(sqMeter)} বর্গমিটার'),
+                _buildCompRow('বর্গলিংক (sq link)', '${BanglaFormatter.formatNumber(sqLink)} বর্গলিংক'),
+              ],
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // 8. Results Card
-          if (r != null && r.isValid)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF14532D), // Emerald card
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('হেরন্স ফর্মুলায় প্রকৃত জমি:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      Text(
-                        '${BanglaFormatter.formatNumber(r.exactAreaDecimal, fractionDigits: 3)} শতক',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                    ],
-                  ),
-                  const Divider(color: Colors.white24, height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('কাঠা: ${BanglaFormatter.formatNumber(r.exactAreaKatha, fractionDigits: 2)} কাঠা', style: const TextStyle(color: Colors.white)),
-                      Text('বর্গফুট: ${BanglaFormatter.formatNumber(r.exactAreaSqFt)} sq ft', style: const TextStyle(color: Colors.white)),
-                    ],
-                  ),
-                ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _saveToHistory,
+                icon: const Icon(Icons.save, size: 18),
+                label: const Text('ইতিহাসে সেভ'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, foregroundColor: Colors.white),
               ),
             ),
-          const SizedBox(height: 30),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _copyReport,
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('রিপোর্ট কপি'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivisionTab(QuadrilateralResult r) {
+    final perPersonDec = r.exactAreaDecimal / _divisionParts;
+    final perPersonSqFt = r.exactAreaSqFt / _divisionParts;
+    final perPersonKatha = perPersonSqFt / 720.0;
+
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('অংশীদার / ওয়ারিশদের মাঝে সমান বণ্টন', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B))),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text('ভাগ সংখ্যা: ${BanglaFormatter.toBanglaDigits(_divisionParts.toString())} জন', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                Expanded(
+                  child: Slider(
+                    value: _divisionParts.toDouble(),
+                    min: 2,
+                    max: 12,
+                    divisions: 10,
+                    onChanged: (v) => setState(() => _divisionParts = v.round()),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            _buildCompRow('প্রতি অংশের জমি (শতক)', '${BanglaFormatter.formatNumber(perPersonDec, fractionDigits: 3)} শতক', isBold: true),
+            _buildCompRow('প্রতি অংশের জমি (কাঠা)', '${BanglaFormatter.formatNumber(perPersonKatha, fractionDigits: 3)} কাঠা'),
+            _buildCompRow('প্রতি অংশের ক্ষেত্রফল', '${BanglaFormatter.formatNumber(perPersonSqFt)} বর্গফুট'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _copyReport,
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('বণ্টন রিপোর্ট কপি করুন'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(child: Text(label, style: TextStyle(fontSize: 12.5, color: isBold ? const Color(0xFF0F172A) : const Color(0xFF475569), fontWeight: isBold ? FontWeight.bold : FontWeight.normal))),
+          const SizedBox(width: 8),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isBold ? const Color(0xFF14532D) : const Color(0xFF1E293B))),
         ],
       ),
     );
@@ -689,14 +912,44 @@ class _QuadInteractivePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const pad = 40.0;
-    final w = size.width - (pad * 2);
-    final h = size.height - (pad * 2);
+    const pad = 42.0;
+    final solved = PolygonGeometry.solveQuadrilateralVertices(
+      north: north,
+      east: east,
+      south: south,
+      west: west,
+      diagAC: diagX,
+    );
 
-    final pA = Offset(pad, pad); // A: Top-Left
-    final pB = Offset(pad + w, pad); // B: Top-Right
-    final pC = Offset(pad + w, pad + h); // C: Bottom-Right
-    final pD = Offset(pad, pad + h); // D: Bottom-Left
+    List<Offset> pts;
+    if (solved != null) {
+      double minX = solved.map((p) => p.dx).reduce(math.min);
+      double maxX = solved.map((p) => p.dx).reduce(math.max);
+      double minY = solved.map((p) => p.dy).reduce(math.min);
+      double maxY = solved.map((p) => p.dy).reduce(math.max);
+      final spanX = math.max(maxX - minX, 1e-6);
+      final spanY = math.max(maxY - minY, 1e-6);
+      final availW = math.max(size.width - pad * 2, 10.0);
+      final availH = math.max(size.height - pad * 2, 10.0);
+      final scale = math.min(availW / spanX, availH / spanY);
+      final offsetX = (size.width - spanX * scale) / 2.0 - minX * scale;
+      final offsetY = (size.height - spanY * scale) / 2.0 - minY * scale;
+      pts = solved.map((p) => Offset(p.dx * scale + offsetX, p.dy * scale + offsetY)).toList();
+    } else {
+      final w = size.width - (pad * 2);
+      final h = size.height - (pad * 2);
+      pts = [
+        const Offset(pad, pad),
+        Offset(pad + w, pad),
+        Offset(pad + w, pad + h),
+        Offset(pad, pad + h),
+      ];
+    }
+
+    final pA = pts[0];
+    final pB = pts[1];
+    final pC = pts[2];
+    final pD = pts[3];
 
     // 1. Polygon Fill
     final path = Path()
@@ -707,13 +960,13 @@ class _QuadInteractivePainter extends CustomPainter {
       ..close();
 
     final fillPaint = Paint()
-      ..color = const Color(0xFFEFF6FF)
+      ..color = solved != null ? const Color(0xFFEFF6FF) : const Color(0xFFFEF2F2)
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
     // 2. Stroke
     final strokePaint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = solved != null ? const Color(0xFF1E293B) : const Color(0xFFDC2626)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, strokePaint);
@@ -722,7 +975,7 @@ class _QuadInteractivePainter extends CustomPainter {
     if (showDiagX) {
       final diagPaint = Paint()
         ..color = const Color(0xFF6366F1)
-        ..strokeWidth = 1.5
+        ..strokeWidth = 1.6
         ..style = PaintingStyle.stroke;
       canvas.drawLine(pA, pC, diagPaint);
     }
@@ -731,17 +984,67 @@ class _QuadInteractivePainter extends CustomPainter {
     if (showDiagY) {
       final diagPaint2 = Paint()
         ..color = const Color(0xFFEC4899)
-        ..strokeWidth = 1.5
+        ..strokeWidth = 1.6
         ..style = PaintingStyle.stroke;
       canvas.drawLine(pB, pD, diagPaint2);
+      final diagBDLen = (pB - pD).distance;
+      final diagScale = solved != null ? (diagBDLen / ((pA - pC).distance > 0 ? (pA - pC).distance : 1.0)) * diagX : 0.0;
+      if (diagScale > 0) {
+        _drawCenteredText(
+          canvas,
+          'BD=${diagScale.toStringAsFixed(1)}\'',
+          Offset((pB.dx + pD.dx) / 2, (pB.dy + pD.dy) / 2 + 10),
+          color: const Color(0xFFDB2777),
+        );
+      }
     }
 
-    // 5. Red Side Name Labels (Page 2)
+    // 5. Corner letters & Interior Angles
+    final centroid = Offset(
+      (pA.dx + pB.dx + pC.dx + pD.dx) / 4.0,
+      (pA.dy + pB.dy + pC.dy + pD.dy) / 4.0,
+    );
+    const cornerNames = ['A', 'B', 'C', 'D'];
+    for (int i = 0; i < 4; i++) {
+      final prev = pts[(i + 3) % 4];
+      final curr = pts[i];
+      final next = pts[(i + 1) % 4];
+      canvas.drawCircle(curr, 3.5, Paint()..color = const Color(0xFF2563EB));
+      final outVec = curr - centroid;
+      final outLen = outVec.distance > 1e-6 ? outVec.distance : 1.0;
+      final outDir = Offset(outVec.dx / outLen, outVec.dy / outLen);
+      _drawCenteredText(
+        canvas,
+        cornerNames[i],
+        curr + outDir * 14,
+        color: const Color(0xFF0F172A),
+      );
+      if (showAngles && solved != null) {
+        final angle = PolygonGeometry.calculateInteriorAngleDegrees(prev, curr, next);
+        _drawCenteredText(
+          canvas,
+          '${angle.toStringAsFixed(0)}°',
+          curr - outDir * 18,
+          color: const Color(0xFF0369A1),
+        );
+      }
+    }
+
+    // 6. Side Name Labels
     if (showSideNames) {
-      _drawCenteredText(canvas, 'উত্তর বাহু (${north.toStringAsFixed(1)}\')', Offset(size.width / 2, pad - 16), color: Colors.red);
-      _drawCenteredText(canvas, 'দক্ষিণ বাহু (${south.toStringAsFixed(1)}\')', Offset(size.width / 2, pad + h + 16), color: Colors.red);
-      _drawCenteredText(canvas, 'পশ্চিম বাহু', Offset(pad - 22, size.height / 2), color: Colors.red, isVertical: true);
-      _drawCenteredText(canvas, 'পূর্ব বাহু', Offset(pad + w + 22, size.height / 2), color: Colors.red, isVertical: true);
+      final edges = [
+        (pA, pB, 'উত্তর (${north.toStringAsFixed(1)}\')'),
+        (pB, pC, 'পূর্ব (${east.toStringAsFixed(1)}\')'),
+        (pC, pD, 'দক্ষিণ (${south.toStringAsFixed(1)}\')'),
+        (pD, pA, 'পশ্চিম (${west.toStringAsFixed(1)}\')'),
+      ];
+      for (final edge in edges) {
+        final mid = Offset((edge.$1.dx + edge.$2.dx) / 2, (edge.$1.dy + edge.$2.dy) / 2);
+        final outVec = mid - centroid;
+        final outLen = outVec.distance > 1e-6 ? outVec.distance : 1.0;
+        final pos = mid + Offset(outVec.dx / outLen, outVec.dy / outLen) * 14;
+        _drawCenteredText(canvas, edge.$3, pos, color: Colors.red);
+      }
     }
   }
 
