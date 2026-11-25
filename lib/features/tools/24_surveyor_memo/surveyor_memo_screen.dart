@@ -329,12 +329,13 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: _serviceType,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'কাজের ধরন / সেবা'),
                       items: const [
-                        DropdownMenuItem(value: 'সরেজমিন জমি পরিমাপ ও সীমানা নির্ধারণ', child: Text('জমি পরিমাপ ও সীমানা নির্ধারণ')),
-                        DropdownMenuItem(value: 'বাটোয়ারা ও দাগ বণ্টন', child: Text('বাটোয়ারা ও দাগ বণ্টন')),
-                        DropdownMenuItem(value: 'মৌজা নকশা ট্রেসিং ও ডিজিটাল অঙ্কন', child: Text('নকশা ট্রেসিং ও ডিজিটাল অঙ্কন')),
-                        DropdownMenuItem(value: 'দলিল তফসিল যাচাই ও আদালত কমিশন', child: Text('দলিল তফসিল যাচাই / আদালত কমিশন')),
+                        DropdownMenuItem(value: 'সরেজমিন জমি পরিমাপ ও সীমানা নির্ধারণ', child: Text('জমি পরিমাপ ও সীমানা নির্ধারণ', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'বাটোয়ারা ও দাগ বণ্টন', child: Text('বাটোয়ারা ও দাগ বণ্টন', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'মৌজা নকশা ট্রেসিং ও ডিজিটাল অঙ্কন', child: Text('নকশা ট্রেসিং ও ডিজিটাল অঙ্কন', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'দলিল তফসিল যাচাই ও আদালত কমিশন', child: Text('দলিল তফসিল যাচাই / আদালত কমিশন', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) => setState(() => _serviceType = val!),
                     ),

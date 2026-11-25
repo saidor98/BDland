@@ -350,13 +350,14 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: _splitDirection,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'বিভাজন রেখার দিক (Direction)',
                         prefixIcon: Icon(Icons.explore, color: AppColors.primaryGreen),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'উত্তর-দক্ষিণ (Vertical)', child: Text('উত্তর-দক্ষিণ বরাবর বিভাজন')),
-                        DropdownMenuItem(value: 'পূর্ব-পশ্চিম (Horizontal)', child: Text('পূর্ব-পশ্চিম বরাবর বিভাজন')),
+                        DropdownMenuItem(value: 'উত্তর-দক্ষিণ (Vertical)', child: Text('উত্তর-দক্ষিণ বরাবর বিভাজন', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'পূর্ব-পশ্চিম (Horizontal)', child: Text('পূর্ব-পশ্চিম বরাবর বিভাজন', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _splitDirection = val);

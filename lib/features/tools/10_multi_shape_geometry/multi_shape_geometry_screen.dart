@@ -191,11 +191,12 @@ class _MultiShapeGeometryScreenState extends State<MultiShapeGeometryScreen> {
                 padding: const EdgeInsets.all(14.0),
                 child: DropdownButtonFormField<String>(
                   value: _selectedShape,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'জ্যামিতিক আকৃতি নির্বাচন করুন',
                     prefixIcon: Icon(Icons.category, color: AppColors.primaryGreen),
                   ),
-                  items: _shapes.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  items: _shapes.map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() {

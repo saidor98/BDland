@@ -176,11 +176,12 @@ class _UnknownSideSolverScreenState extends State<UnknownSideSolverScreen> {
                   children: [
                     DropdownButtonFormField<String>(
                       value: _mode,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'জমি বিভাজন বা আকৃতির ধরন'),
                       items: const [
-                        DropdownMenuItem(value: 'আয়তক্ষেত্রাকার জমি', child: Text('আয়তক্ষেত্র (দৈর্ঘ্য দেওয়া আছে, প্রস্থ নির্ণয়)')),
-                        DropdownMenuItem(value: 'ট্রাপিজিয়াম (গড় বিস্তার)', child: Text('ট্রাপিজিয়াম (১ম বাহু ও উচ্চতা দেওয়া, ২য় বাহু নির্ণয়)')),
-                        DropdownMenuItem(value: 'ত্রিভুজাকার জমি', child: Text('ত্রিভুজ (ভূমি দেওয়া, উচ্চতা/অপর বাহু নির্ণয়)')),
+                        DropdownMenuItem(value: 'আয়তক্ষেত্রাকার জমি', child: Text('আয়তক্ষেত্র (দৈর্ঘ্য দেওয়া আছে, প্রস্থ নির্ণয়)', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'ট্রাপিজিয়াম (গড় বিস্তার)', child: Text('ট্রাপিজিয়াম (১ম বাহু ও উচ্চতা দেওয়া, ২য় বাহু নির্ণয়)', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'ত্রিভুজাকার জমি', child: Text('ত্রিভুজ (ভূমি দেওয়া, উচ্চতা/অপর বাহু নির্ণয়)', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) {

@@ -154,12 +154,13 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: _surveyType,
+                            isExpanded: true,
                             decoration: const InputDecoration(labelText: 'জরিপ প্রকার'),
                             items: const [
-                              DropdownMenuItem(value: 'CS খতিয়ান', child: Text('CS খতিয়ান')),
-                              DropdownMenuItem(value: 'SA খতিয়ান', child: Text('SA খতিয়ান')),
-                              DropdownMenuItem(value: 'RS খতিয়ান', child: Text('RS খতিয়ান')),
-                              DropdownMenuItem(value: 'BS / সিটি জরিপ', child: Text('BS / সিটি জরিপ')),
+                              DropdownMenuItem(value: 'CS খতিয়ান', child: Text('CS খতিয়ান', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'SA খতিয়ান', child: Text('SA খতিয়ান', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'RS খতিয়ান', child: Text('RS খতিয়ান', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'BS / সিটি জরিপ', child: Text('BS / সিটি জরিপ', overflow: TextOverflow.ellipsis)),
                             ],
                             onChanged: (val) => setState(() => _surveyType = val!),
                           ),
