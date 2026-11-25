@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/polygon_geometry.dart';
@@ -266,7 +267,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     final r = _result;
     if (r == null || !r.isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('সঠিক চতুর্ভুজ মান দিয়ে হিসাব করুন'), backgroundColor: AppColors.errorRed),
+        const SnackBar(content: Text('সঠিক চতুর্ভুজ মান দিয়ে হিসাব করুন'), backgroundColor: AppColors.accentCrimson),
       );
       return;
     }
@@ -513,7 +514,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed),
+                  const Icon(Icons.warning_amber_rounded, color: AppColors.accentCrimson),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -776,7 +777,7 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Text('ভাগ সংখ্যা: ${BanglaFormatter.toBanglaDigits(_divisionParts.toString())} জন', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                Text('ভাগ সংখ্যা: ${BanglaNumerals.toBangla(_divisionParts)} জন', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
                 Expanded(
                   child: Slider(
                     value: _divisionParts.toDouble(),

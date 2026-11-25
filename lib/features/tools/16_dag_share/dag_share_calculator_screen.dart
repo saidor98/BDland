@@ -167,7 +167,7 @@ class _DagShareCalculatorScreenState extends State<DagShareCalculatorScreen> {
                     if (isShareInvalid)
                       const Text(
                         'সতর্কতা: খতিয়ানের হিস্যা ১.০০০০০০ (১৬ আনা) এর বেশি হতে পারে না।',
-                        style: TextStyle(color: AppColors.errorRed, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: AppColors.accentCrimson, fontSize: 12, fontWeight: FontWeight.bold),
                       )
                     else
                       Align(

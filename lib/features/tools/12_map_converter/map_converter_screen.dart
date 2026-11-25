@@ -181,7 +181,7 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('এক্সপোর্ট ত্রুটি: $e'), backgroundColor: AppColors.errorRed),
+          SnackBar(content: Text('এক্সপোর্ট ত্রুটি: $e'), backgroundColor: AppColors.accentCrimson),
         );
       }
     } finally {

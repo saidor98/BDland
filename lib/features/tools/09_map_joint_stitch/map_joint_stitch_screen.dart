@@ -106,7 +106,7 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ম্যাপ এক্সপোর্ট ত্রুটি: $e'), backgroundColor: AppColors.errorRed),
+          SnackBar(content: Text('ম্যাপ এক্সপোর্ট ত্রুটি: $e'), backgroundColor: AppColors.accentCrimson),
         );
       }
     } finally {

@@ -222,7 +222,7 @@ class _KhatianAnalyzerScreenState extends State<KhatianAnalyzerScreen> {
                                 deltaShare > 0
                                     ? 'অবশিষ্ট কম: ${BanglaFormatter.formatNumber(deltaShare, fractionDigits: 6)} (${AnaGondaShare.fromFraction(deltaShare).toBanglaText()})'
                                     : 'অতিরিক্ত বেশি: ${BanglaFormatter.formatNumber(-deltaShare, fractionDigits: 6)} (${AnaGondaShare.fromFraction(-deltaShare).toBanglaText()})',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.errorRed),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accentCrimson),
                               ),
                             ),
                         ],
