@@ -204,7 +204,7 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
                                 width: halfW + _horizontalOverlap,
                                 height: constraints.maxHeight - 40,
                                 child: _sheetAAsset != null
-                                    ? MouzaSheetImage(assetPath: _sheetAAsset, fit: BoxFit.contain)
+                                    ? MouzaSheetImage(source: _sheetAAsset!, fit: BoxFit.contain)
                                     : Container(color: const Color(0xFFFAF6EE), child: const Center(child: Text('ভেক্টর শিট ১'))),
                               ),
                               Positioned(
@@ -215,7 +215,7 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
                                 child: Transform.rotate(
                                   angle: _sheetBRotation * math.pi / 180.0,
                                   child: _sheetBAsset != null
-                                      ? MouzaSheetImage(assetPath: _sheetBAsset, fit: BoxFit.contain)
+                                      ? MouzaSheetImage(source: _sheetBAsset!, fit: BoxFit.contain)
                                       : Container(color: const Color(0xFFFDFBF7), child: const Center(child: Text('ভেক্টর শিট ২'))),
                                 ),
                               ),

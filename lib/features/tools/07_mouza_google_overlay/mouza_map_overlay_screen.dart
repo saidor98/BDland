@@ -37,7 +37,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
   Map<String, double> _computeGeoBounds() {
     final center = _mapController.currentCenter;
     final zoom = _mapController.currentZoom;
-    final centerPx = EsriSatelliteMapView.latLngToWorldPixels(center.lat, center.lng, zoom);
+    final centerPx = EsriSatelliteMapView.latLngToWorldPixels(center.latitude, center.longitude, zoom);
     final halfSheetW = (320.0 * _scale) / 2.0;
     final halfSheetH = (360.0 * _scale) / 2.0;
 
@@ -63,10 +63,10 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
     );
 
     return {
-      'north': math.max(nw.lat, se.lat),
-      'south': math.min(nw.lat, se.lat),
-      'east': math.max(nw.lng, se.lng),
-      'west': math.min(nw.lng, se.lng),
+      'north': math.max(nw.latitude, se.latitude),
+      'south': math.min(nw.latitude, se.latitude),
+      'east': math.max(nw.longitude, se.longitude),
+      'west': math.min(nw.longitude, se.longitude),
     };
   }
 
@@ -173,7 +173,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                                 width: 320,
                                 height: 360,
                                 child: MouzaSheetImage(
-                                  assetPath: _selectedSheetAsset,
+                                  source: _selectedSheetAsset!,
                                   fit: BoxFit.contain,
                                 ),
                               ),

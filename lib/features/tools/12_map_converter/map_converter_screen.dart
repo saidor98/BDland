@@ -298,7 +298,7 @@ EOF
                                 size: const Size(300, 300),
                               ),
                             )
-                          : MouzaSheetImage(assetPath: _selectedSheetAsset, fit: BoxFit.contain),
+                          : MouzaSheetImage(source: _selectedSheetAsset!, fit: BoxFit.contain),
                     ),
                   ),
                 ),
