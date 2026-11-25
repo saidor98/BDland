@@ -1,0 +1,356 @@
+﻿<!DOCTYPE html>
+
+<html lang="bn"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><title>BDLand Pro</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#faf8ff;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "primary": "#004126", "secondary-fixed-dim": "#f6be45", "background": "#faf8ff", "on-secondary-container": "#725200", "error-container": "#ffdad6", "on-primary": "#ffffff", "error": "#ba1a1a", "surface-dim": "#d2d9f4", "on-error-container": "#93000a", "on-tertiary": "#ffffff", "surface-container-low": "#f2f3ff", "on-primary-fixed": "#002111", "on-primary-fixed-variant": "#005231", "on-surface-variant": "#404942", "surface-container-highest": "#dae2fd", "on-tertiary-container": "#85c7ff", "tertiary-fixed-dim": "#93ccff", "tertiary-fixed": "#cce5ff", "on-surface": "#131b2e", "surface": "#faf8ff", "primary-fixed-dim": "#90d6aa", "inverse-primary": "#90d6aa", "on-background": "#131b2e", "inverse-on-surface": "#eef0ff", "on-tertiary-fixed": "#001d31", "surface-tint": "#256a47", "surface-container-high": "#e2e7ff", "surface-container-lowest": "#ffffff", "outline-variant": "#bfc9c0", "secondary-fixed": "#ffdea3", "surface-container": "#eaedff", "on-primary-container": "#8acfa4", "primary-container": "#0f5a38", "on-secondary-fixed": "#261900", "tertiary-container": "#00537f", "tertiary": "#003b5d", "on-tertiary-fixed-variant": "#004b73", "surface-bright": "#faf8ff", "on-error": "#ffffff", "inverse-surface": "#283044", "on-secondary": "#ffffff", "secondary": "#7a5900", "outline": "#707971", "surface-variant": "#dae2fd", "on-secondary-fixed-variant": "#5d4200", "secondary-container": "#ffc64d", "primary-fixed": "#abf2c5" }, borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, spacing: { "space-xs": "0.25rem", "space-lg": "1rem", "space-xl": "1.5rem", "margin-tablet": "1.5rem", "space-sm": "0.5rem", "space-md": "0.75rem", "space-2xl": "2rem", "margin": "1rem", "gutter-tablet": "1rem", "gutter": "0.75rem" }, fontFamily: { "body-md": ["Noto Sans"], "headline-md": ["Noto Sans"], "title-md": ["Noto Sans"], "body-lg": ["Noto Sans"], "label-md": ["JetBrains Mono"], "display-lg": ["Noto Sans"], "label-sm": ["JetBrains Mono"], "label-lg": ["JetBrains Mono"], "headline-lg": ["Noto Sans"], "data-metric": ["JetBrains Mono"] }, fontSize: { "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "title-md": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }], "label-md": ["11px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "display-lg": ["34px", { "lineHeight": "42px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "400" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }], "headline-lg": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "data-metric": ["18px", { "lineHeight": "22px", "fontWeight": "700" }] } } } }</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 inset-x-0 z-50 bg-primary shadow-[0_4px_16px_rgba(0,41,17,0.18)] pt-safe select-none"><div class="flex justify-between items-center px-space-lg h-6 text-on-primary font-label-sm text-label-sm"><div class="flex items-center gap-space-xs font-semibold"><span>10:42</span><span class="px-1 py-0.5 rounded bg-surface-container-lowest/15 text-secondary-fixed text-[9px] font-label-sm">RTK:FIX</span></div><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[14px]">network_cell</span><span class="font-label-sm tracking-tight text-[9px]">5G</span><span class="material-symbols-outlined text-[14px]">wifi</span><span class="material-symbols-outlined text-[14px]">battery_full</span></div></div><div class="h-16 px-space-md flex items-center justify-between gap-space-xs"><div class="flex items-center gap-space-xs"><button aria-label="Navigation Drawer" class="w-11 h-11 flex items-center justify-center rounded-lg text-on-primary hover:bg-surface-container-lowest/10 active:scale-95 transition-all"><span class="material-symbols-outlined text-[22px]">menu</span></button><img alt="BDLand Pro Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/ALJJyrCULh7DPh9EoHbRCofsUxKcqgLs6mRUHP4WejHU2tTMnZkHY-eyWjF6MwBEemt81hSoTmTvWrEmSkOXlK2awGivDx1x0QVjcXM0q0KecxxJ_Ct2KBmmW6usMgbrDjI4zanuME6tja6NOESkiSfzSta0bidGEfJHzLwWbeg6mkaOuUN6kGyKBySXTgqjfcrAkkTdBOwaZ9MLonp-5HCLZW-FfBh4EpSB84XDxjBkK97SgCu0ThkbaoOW5Fs"/><span class="hidden sm:inline font-headline-md text-title-md text-on-primary tracking-tight font-bold">BDLand</span></div><div class="flex items-center"><button class="flex items-center gap-space-xs bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 px-space-sm py-1.5 rounded-full transition-all text-left"><div class="flex flex-col"><div class="flex items-center gap-1"><span class="font-body-md text-body-md text-on-primary font-semibold truncate max-w-[130px]">à¦†à¦®à¦¿à¦¨à¦ªà§à¦° (à¦œà§‡.à¦à¦². à§©à§ª)</span><span class="material-symbols-outlined text-secondary-fixed text-[16px]">arrow_drop_down</span></div><div class="flex items-center gap-1"><span class="px-1.5 py-0.2 bg-secondary/30 rounded text-secondary-fixed font-label-sm text-label-sm">à¦¸à¦¿à¦Ÿ: à§¦à§¨</span><span class="text-on-primary-container font-label-sm text-label-sm truncate max-w-[60px]">RS à¦œà¦°à¦¿à¦ª</span></div></div></button></div><div class="flex items-center"><button aria-label="Layer Switcher" class="relative w-11 h-11 flex items-center justify-center rounded-lg text-on-primary hover:bg-surface-container-lowest/10"><span class="material-symbols-outlined text-[20px] text-tertiary-fixed-dim">layers</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-secondary-fixed-dim animate-pulse"></span></button><button aria-label="CAD Overlays" class="w-11 h-11 flex items-center justify-center rounded-lg text-on-primary hover:bg-surface-container-lowest/10"><span class="material-symbols-outlined text-[20px]">grid_4x4</span></button><button aria-label="Video Support" class="w-11 h-11 flex items-center justify-center rounded-lg text-on-primary hover:bg-surface-container-lowest/10"><span class="material-symbols-outlined text-[20px]">smart_display</span></button><div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center ml-1"><span class="material-symbols-outlined text-on-secondary-container text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-[88px] pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full pb-6 space-y-space-md">
+<!-- Active Project Context & Survey HUD -->
+<div class="relative bg-surface-container-lowest p-space-md shadow-sm overflow-hidden">
+<div class="absolute -right-6 -bottom-6 w-32 h-32 bg-primary/5 rounded-full pointer-events-none"></div>
+<div class="flex items-center justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-xs min-w-0">
+<button aria-label="à¦ªà§‚à¦°à§à¦¬à¦¬à¦°à§à¦¤à§€ à¦¸à§à¦•à§à¦°à¦¿à¦¨" class="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-transform active:scale-95" type="button">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<div class="min-w-0">
+<div class="flex items-center gap-1">
+<span class="font-headline-md text-title-md text-primary font-bold truncate">à¦†à¦®à¦¿à¦¨à¦ªà§à¦° (à¦œà§‡.à¦à¦². à§©à§ª)</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">expand_more</span>
+</div>
+<p class="font-body-md text-label-sm text-on-surface-variant truncate">à¦¸à¦¿à¦Ÿ: à§¦à§¨ â€¢ à¦¥à¦¾à¦¨à¦¾: à¦¸à¦¾à¦­à¦¾à¦°, à¦¢à¦¾à¦•à¦¾ â€¢ à¦†à¦°.à¦à¦¸ à¦œà¦°à¦¿à¦ª</p>
+</div>
+</div>
+<!-- Quick Action Cluster -->
+<div class="flex items-center gap-1 flex-shrink-0">
+<button class="relative w-8 h-8 rounded-lg bg-tertiary-container/20 text-tertiary flex items-center justify-center hover:bg-tertiary-container/40" title="GPS à¦œà¦¿à¦“-à¦°à§‡à¦«à¦¾à¦°à§‡à¦¨à§à¦¸ à¦…à¦¨" type="button">
+<span class="material-symbols-outlined text-[18px]">share_location</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary-fixed-dim animate-ping"></span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary-fixed-dim"></span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center hover:text-primary" title="CAD à¦²à§‡à¦¯à¦¼à¦¾à¦° à¦¯à§‹à¦— à¦•à¦°à§à¦¨" type="button">
+<span class="material-symbols-outlined text-[18px]">drive_file_rename_outline</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-surface-container text-on-surface-variant flex items-center justify-center hover:text-primary" title="à¦•à¦¨à§à¦Ÿà§à¦°à¦¾à¦¸à§à¦Ÿ à¦®à§‹à¦¡ (CAD à¦¬à§à¦²à§à¦¯à¦¾à¦•)" type="button">
+<span class="material-symbols-outlined text-[18px]">contrast</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-error-container/30 text-error flex items-center justify-center hover:bg-error-container/50" title="à¦­à¦¿à¦¡à¦¿à¦“ à¦¸à¦¹à¦¾à¦¯à¦¼à¦¤à¦¾ à¦Ÿà¦¿à¦‰à¦Ÿà§‹à¦°à¦¿à§Ÿà¦¾à¦²" type="button">
+<span class="material-symbols-outlined text-[18px]">smart_display</span>
+</button>
+</div>
+</div>
+<!-- Active Hardware / Precision Metric Badge -->
+<div class="flex items-center justify-between bg-surface-container-low px-space-sm py-1.5 rounded-lg text-label-sm font-label-sm">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[14px]">tune</span>
+<span>à¦¸à§à¦•à§‡à¦² à¦®à¦¾à¦¨à¦¦à¦£à§à¦¡: à§§à§¬" = à§§ à¦®à¦¾à¦‡à¦² (Gunia 100 Link)</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-md">
+<span>EPSG: 3106 (BTM)</span>
+</div>
+</div>
+</div>
+<!-- Saved Projects Local Storage Ledger -->
+<div class="px-space-md">
+<div class="relative bg-surface-container-lowest p-space-md shadow-sm rounded-lg overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-secondary-container"></div>
+<div class="pl-space-xs">
+<div class="flex items-center justify-between mb-1.5">
+<div class="flex items-center gap-space-xs">
+<span class="w-7 h-7 rounded-lg bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[16px]">folder_special</span>
+</span>
+<span class="font-headline-md text-title-md text-on-surface font-bold">à¦¸à¦‚à¦°à¦•à§à¦·à¦¿à¦¤ à¦ªà§à¦°à¦œà§‡à¦•à§à¦Ÿ à¦“ à¦¡à§à¦°à¦¾à¦«à¦Ÿ</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-primary font-label-sm text-label-sm font-semibold">à§¨à¦Ÿà¦¿ à¦ªà§à¦°à¦¸à§à¦¤à§à¦¤</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-sm leading-relaxed">
+          à¦¸à¦‚à¦°à¦•à§à¦·à¦¿à¦¤ à¦ªà¦°à¦¿à¦®à¦¾à¦ª à¦«à¦¾à¦‡à¦²à¦—à§à¦²à§‹ à¦¦à§‡à¦–à¦¤à§‡ à¦«à§‹à¦¨à§‡à¦° <code class="font-label-sm text-primary font-semibold bg-surface-container px-1 py-0.5 rounded">BDLandPro</code> à¦«à§‹à¦²à§à¦¡à¦¾à¦°à¦Ÿà¦¿ à¦¨à¦¿à¦°à§à¦¬à¦¾à¦šà¦¨ à¦•à¦°à§à¦¨à¥¤
+        </p>
+<div class="bg-surface-container-low p-space-xs rounded-lg mb-space-sm flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant truncate">
+<span class="truncate">à¦¸à§à¦Ÿà§‹à¦°à§‡à¦œ: /Internal Storage/BDLandPro/Maps</span>
+<span class="material-symbols-outlined text-[14px] text-primary flex-shrink-0 ml-1">verified_user</span>
+</div>
+<!-- Recent Projects Mini-list -->
+<div class="space-y-1.5 mb-space-md">
+<div class="flex items-center justify-between p-2 rounded bg-surface-container hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-[18px] text-primary">description</span>
+<div class="min-w-0">
+<p class="font-headline-md text-body-md font-semibold text-on-surface truncate">à¦†à¦®à¦¿à¦¨à¦ªà§à¦°_à¦¦à¦¾à¦—_à§ªà§«à§¨_à¦šà§‚à¦¡à¦¼à¦¾à¦¨à§à¦¤.bdl</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">à¦¸à¦‚à¦¶à§‹à¦§à¦¿à¦¤: à¦†à¦œ à§§à§¦:à§§à§« AM</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold flex-shrink-0 ml-2">à§©.à§ª MB</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded bg-surface-container hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-[18px] text-tertiary">polyline</span>
+<div class="min-w-0">
+<p class="font-headline-md text-body-md font-semibold text-on-surface truncate">à¦•à¦¾à¦¶à¦¿à¦®à¦ªà§à¦°_à¦¸à¦¿à¦à¦¸_à¦¸à¦¿à¦Ÿà§§.cad</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">à¦¸à¦‚à¦¶à§‹à¦§à¦¿à¦¤: à¦—à¦¤à¦•à¦¾à¦²</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold flex-shrink-0 ml-2">à§§.à§® MB</span>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-space-xs py-2.5 px-4 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-primary font-headline-md text-body-md font-bold transition-transform active:scale-98" type="button">
+<span class="material-symbols-outlined text-[18px]">snippet_folder</span>
+<span>à¦«à§‹à¦²à§à¦¡à¦¾à¦° à¦¬à§‡à¦›à§‡ à¦¨à¦¿à¦¨ (Select Workspace)</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Load Mouza Map Section -->
+<div class="px-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-primary">map</span>
+<h2 class="font-headline-md text-title-md text-on-surface font-bold">à¦®à§Œà¦œà¦¾ à¦¨à¦•à¦¶à¦¾ à¦¯à§à¦•à§à¦¤ à¦•à¦°à§à¦¨ (Load Sheet)</h2>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Raster &amp; Vector</span>
+</div>
+<!-- Dual Source Selection Grid -->
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Card 1: Local Device -->
+<div class="flex flex-col justify-between p-space-md rounded-lg bg-surface-container-lowest shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="absolute top-0 right-0 w-12 h-12 bg-primary/5 rounded-bl-full pointer-events-none"></div>
+<div>
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary mb-space-sm shadow-sm">
+<span class="material-symbols-outlined text-[22px]">upload_file</span>
+</div>
+<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-[9px] font-semibold mb-1">
+            JPG â€¢ PDF â€¢ TIFF â€¢ DXF
+          </span>
+<h3 class="font-headline-md text-body-lg font-bold text-on-surface mb-1">à¦¡à¦¿à¦­à¦¾à¦‡à¦¸ à¦¥à§‡à¦•à§‡</h3>
+<p class="font-body-md text-label-sm text-on-surface-variant mb-space-md line-clamp-2">
+            à¦¸à§à¦•à§à¦¯à¦¾à¦¨ à¦•à¦°à¦¾ à¦†à¦®à¦¿à¦¨ à¦¨à¦•à¦¶à¦¾ à¦¬à¦¾ à¦¹à¦¾à¦‡-à¦°à§‡à¦œà§‹à¦²à¦¿à¦‰à¦¶à¦¨ à¦¡à§à¦°à¦¾à¦«à¦Ÿ à¦‡à¦®à§‡à¦œ à¦¯à§à¦•à§à¦¤ à¦•à¦°à§à¦¨à¥¤
+          </p>
+</div>
+<button class="w-full py-2 px-2 rounded-lg bg-primary text-on-primary font-headline-md text-label-lg font-semibold flex items-center justify-center gap-1 active:scale-95 shadow-sm" type="button">
+<span>à¦«à¦¾à¦‡à¦² à¦¬à¦¾à¦›à§à¦¨</span>
+<span class="material-symbols-outlined text-[16px]">file_open</span>
+</button>
+</div>
+<!-- Card 2: National Mouza Cloud -->
+<div class="flex flex-col justify-between p-space-md rounded-lg bg-surface-container-lowest shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="absolute top-0 right-0 w-12 h-12 bg-secondary-fixed/30 rounded-bl-full pointer-events-none"></div>
+<div>
+<div class="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center text-on-secondary-container mb-space-sm shadow-sm">
+<span class="material-symbols-outlined text-[22px]">cloud_download</span>
+</div>
+<span class="inline-block px-1.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-label-sm text-[9px] font-bold mb-1">
+            CS â€¢ SA â€¢ RS â€¢ BS à¦œà¦°à¦¿à¦ª
+          </span>
+<h3 class="font-headline-md text-body-lg font-bold text-on-surface mb-1">à¦•à§à¦²à¦¾à¦‰à¦¡ à¦¡à¦¾à¦Ÿà¦¾à¦¬à§‡à¦¸</h3>
+<p class="font-body-md text-label-sm text-on-surface-variant mb-space-md line-clamp-2">
+            à¦¬à¦¾à¦‚à¦²à¦¾à¦¦à§‡à¦¶à§‡à¦° à§¬à§ª à¦œà§‡à¦²à¦¾à¦° à¦¡à¦¿à¦œà¦¿à¦Ÿà¦¾à¦² à¦°à§‡à¦•à¦°à§à¦¡ à¦“ à¦…à¦¨à¦²à¦¾à¦‡à¦¨ à¦¸à¦¾à¦°à§à¦­à§‡ à¦ªà§‹à¦°à§à¦Ÿà¦¾à¦²à¥¤
+          </p>
+</div>
+<button class="w-full py-2 px-2 rounded-lg bg-secondary-container text-on-secondary-container font-headline-md text-label-lg font-bold flex items-center justify-center gap-1 active:scale-95 shadow-sm" type="button">
+<span>à¦®à§Œà¦œà¦¾ à¦–à§à¦à¦œà§à¦¨</span>
+<span class="material-symbols-outlined text-[16px]">travel_explore</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Map Quality & Rendering Engine Settings -->
+<div class="px-space-md">
+<div class="p-space-md rounded-lg bg-surface-container-lowest shadow-sm space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-primary">view_in_ar</span>
+<span class="font-headline-md text-body-lg font-bold text-on-surface">à¦®à§à¦¯à¦¾à¦ª à¦°à§‡à¦¨à§à¦¡à¦¾à¦° à¦®à¦¾à¦¨</span>
+</div>
+<span class="font-label-sm text-label-sm text-tertiary font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+          OpenGL GPU 4K
+        </span>
+</div>
+<!-- Segmented High/Low Resolution Pills -->
+<div class="grid grid-cols-2 gap-space-xs p-1 bg-surface-container rounded-lg">
+<button class="flex flex-col items-center justify-center py-2 px-2 rounded-lg bg-primary text-on-primary shadow-sm text-center" type="button">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-secondary-fixed">verified</span>
+<span class="font-headline-md text-label-lg font-bold">HD à¦«à§à¦² à¦•à§‹à¦¯à¦¼à¦¾à¦²à¦¿à¦Ÿà¦¿</span>
+</div>
+<span class="font-body-md text-label-sm text-on-primary-container text-[10px]">à¦†à¦¸à¦² à¦°à§‡à¦œà§‹à¦²à¦¿à¦‰à¦¶à¦¨ à¦“ à¦¨à¦¿à¦–à§à¦à¦¤ à¦œà§à¦®</span>
+</button>
+<button class="flex flex-col items-center justify-center py-2 px-2 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors text-center" type="button">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">bolt</span>
+<span class="font-headline-md text-label-lg font-bold">à¦¦à§à¦°à§à¦¤ à¦®à§‹à¦¡ (Fast)</span>
+</div>
+<span class="font-body-md text-label-sm text-on-surface-variant text-[10px]">à¦•à¦® à¦®à§‡à¦®à¦°à¦¿à¦¤à§‡ à¦¦à§à¦°à§à¦¤ à¦²à§‹à¦¡à¦¿à¦‚</span>
+</button>
+</div>
+<!-- Orthorectification Toggle Row -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">explore</span>
+<div>
+<p class="font-headline-md text-body-md font-semibold text-on-surface">à¦¨à¦•à¦¶à¦¾ à¦…à¦Ÿà§‹-à¦…à¦°à§à¦¥à§‹à¦°à§‡à¦«à¦¾à¦°à§‡à¦¨à§à¦¸à¦¿à¦‚</p>
+<p class="font-body-md text-label-sm text-on-surface-variant">BTM à¦•à§‹à¦…à¦°à§à¦¡à¦¿à¦¨à§‡à¦Ÿ à¦¸à¦¿à¦¸à§à¦Ÿà§‡à¦®à§‡ à¦…à¦Ÿà§‹ à¦¸à§à¦•à§‡à¦²à¦¿à¦‚</p>
+</div>
+</div>
+<!-- Mock Switch Toggle Active -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Total Station & RTK GNSS Instrument Deck -->
+<div class="px-space-md">
+<div class="p-space-md rounded-lg bg-inverse-surface text-inverse-on-surface shadow-md space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-tertiary-fixed-dim">satellite_alt</span>
+<span class="font-headline-md text-title-md font-bold text-white">Total Station / RTK GPS</span>
+</div>
+<div class="flex items-center gap-1 bg-tertiary-container/80 px-2 py-0.5 rounded text-tertiary-fixed font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim animate-pulse"></span>
+<span>FIX: 3D RTK (Â±à§¨ à¦®à¦¿.à¦®à¦¿.)</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-label-sm font-label-sm text-inverse-on-surface/75 bg-slate-900/60 px-space-sm py-1 rounded">
+<span>à¦¸à§à¦¯à¦¾à¦Ÿà§‡à¦²à¦¾à¦‡à¦Ÿ: à§¨à§® à¦²à¦•à¦¡ (GPS/BDS/GLONASS)</span>
+<span>PDOP: à§§.à§§à§¨</span>
+</div>
+<!-- Real-time Coordinate Input Matrix -->
+<div class="grid grid-cols-3 gap-2 py-1">
+<div class="bg-slate-900/80 p-2 rounded text-center">
+<span class="font-label-sm text-[10px] text-slate-400 block">à¦‰à¦¤à§à¦¤à¦° (Northing / Y)</span>
+<span class="font-data-metric text-label-lg font-bold text-emerald-400">2642180.452</span>
+<span class="font-label-sm text-[9px] text-slate-500 block">à¦®à¦¿à¦Ÿà¦¾à¦°</span>
+</div>
+<div class="bg-slate-900/80 p-2 rounded text-center">
+<span class="font-label-sm text-[10px] text-slate-400 block">à¦ªà§‚à¦°à§à¦¬ (Easting / X)</span>
+<span class="font-data-metric text-label-lg font-bold text-secondary-fixed-dim">542310.128</span>
+<span class="font-label-sm text-[9px] text-slate-500 block">à¦®à¦¿à¦Ÿà¦¾à¦°</span>
+</div>
+<div class="bg-slate-900/80 p-2 rounded text-center">
+<span class="font-label-sm text-[10px] text-slate-400 block">à¦‰à¦šà§à¦šà¦¤à¦¾ (RL / Z)</span>
+<span class="font-data-metric text-label-lg font-bold text-tertiary-fixed-dim">14.820</span>
+<span class="font-label-sm text-[9px] text-slate-500 block">à¦®à¦¿à¦Ÿà¦¾à¦°</span>
+</div>
+</div>
+<!-- RTK Actions -->
+<div class="grid grid-cols-3 gap-2 pt-1 font-headline-md text-label-md">
+<button class="py-2 px-1 rounded bg-primary-container text-on-primary font-bold flex items-center justify-center gap-1 active:scale-95" type="button">
+<span class="material-symbols-outlined text-[15px]">add_location</span>
+<span>à¦ªà¦¯à¦¼à§‡à¦¨à§à¦Ÿ à¦¯à§‹à¦—</span>
+</button>
+<button class="py-2 px-1 rounded bg-slate-800 text-slate-200 font-medium flex items-center justify-center gap-1 hover:bg-slate-700" type="button">
+<span class="material-symbols-outlined text-[15px]">file_upload</span>
+<span>CSV/KML</span>
+</button>
+<button class="py-2 px-1 rounded bg-slate-800 text-slate-200 font-medium flex items-center justify-center gap-1 hover:bg-slate-700" type="button">
+<span class="material-symbols-outlined text-[15px]">linear_scale</span>
+<span>à¦…à¦Ÿà§‹ à¦²à¦¿à¦‚à¦•</span>
+</button>
+</div>
+</div>
+</div>
+<!-- CAD Viewport Live Strip & Precision Gunia Calculator -->
+<div class="px-space-md">
+<div class="p-space-md rounded-lg bg-surface-container-lowest shadow-md space-y-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-primary">square_foot</span>
+<div>
+<h3 class="font-headline-md text-body-lg font-bold text-on-surface">CAD à¦•à§à¦¯à¦¾à¦¨à¦­à¦¾à¦¸ à¦“ à¦œà¦®à¦¿ à¦¹à¦¿à¦¸à¦¾à¦¬</h3>
+<p class="font-body-md text-label-sm text-on-surface-variant">à¦²à¦¾à¦‡à¦­ à¦¬à¦¾à¦‰à¦¨à§à¦¡à¦¾à¦°à¦¿ à¦…à§à¦¯à¦¾à¦¨à¦¾à¦²à¦¾à¦‡à¦¸à¦¿à¦¸</p>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">à¦¦à¦¾à¦— à¦¨à¦‚: à§ªà§«à§¨</span>
+</div>
+<!-- Visual Gunia Scale Simulation Ruler -->
+<div class="p-2.5 rounded-lg bg-surface-container-low">
+<div class="flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant mb-1">
+<span class="font-bold text-primary">à¦ªà¦¿à¦¤à¦²à§‡à¦° à¦—à§à¦¨à¦¿à§Ÿà¦¾ à¦¸à§à¦•à§‡à¦² (Gunia Scale)</span>
+<span class="font-label-md">à§§à§¦à§¦ à¦²à¦¿à¦‚à¦• = à§¬à§¬ à¦«à§à¦Ÿ</span>
+</div>
+<!-- Graphical Ruler Ticks -->
+<div class="relative h-7 w-full bg-secondary-fixed/40 rounded flex items-end justify-between px-1.5 pb-0.5 overflow-hidden">
+<div class="h-5 w-0.5 bg-secondary"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-3.5 w-0.5 bg-secondary"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-5 w-0.5 bg-secondary"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-3.5 w-0.5 bg-secondary"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-2 w-0.5 bg-secondary/60"></div>
+<div class="h-5 w-0.5 bg-secondary"></div>
+<!-- Precision Cursor / Reticle Indicator -->
+<div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-error"></div>
+</div>
+<div class="flex justify-between text-[9px] font-label-sm text-on-surface-variant mt-1">
+<span>à§¦ à¦²à¦¿à¦‚à¦•</span>
+<span>à§«à§¦ à¦²à¦¿à¦‚à¦•</span>
+<span>à§§à§¦à§¦ à¦²à¦¿à¦‚à¦•</span>
+<span>à§§à§«à§¦ à¦²à¦¿à¦‚à¦•</span>
+<span>à§¨à§¦à§¦ à¦²à¦¿à¦‚à¦•</span>
+</div>
+</div>
+<!-- Real-Time Area Calculation Units 4-Block Grid -->
+<div class="grid grid-cols-2 gap-space-xs">
+<div class="p-space-xs rounded bg-surface-container flex items-center justify-between">
+<span class="font-body-md text-label-sm text-on-surface-variant">à¦¶à¦¤à¦• (Decimal)</span>
+<span class="font-data-metric text-title-md font-bold text-primary">à§§à§«.à§­à§«</span>
+</div>
+<div class="p-space-xs rounded bg-surface-container flex items-center justify-between">
+<span class="font-body-md text-label-sm text-on-surface-variant">à¦•à¦¾à¦ à¦¾ (Katha)</span>
+<span class="font-data-metric text-title-md font-bold text-primary">à§¯.à§«à§ª</span>
+</div>
+<div class="p-space-xs rounded bg-surface-container flex items-center justify-between">
+<span class="font-body-md text-label-sm text-on-surface-variant">à¦à¦•à¦° (Acre)</span>
+<span class="font-data-metric text-title-md font-bold text-primary">à§¦.à§§à§«à§­</span>
+</div>
+<div class="p-space-xs rounded bg-surface-container flex items-center justify-between">
+<span class="font-body-md text-label-sm text-on-surface-variant">à¦¬à¦°à§à¦—à¦«à§à¦Ÿ (Sq.Ft)</span>
+<span class="font-data-metric text-title-md font-bold text-primary">à§¬à§®à§¬à§¦.à§«</span>
+</div>
+</div>
+<!-- Quick CAD Operations Icon Row -->
+<div class="flex items-center justify-between gap-1 overflow-x-auto py-1">
+<button class="flex flex-col items-center gap-1 min-w-[58px] p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">straighten</span>
+<span class="font-label-sm text-[9px] text-on-surface font-semibold">à¦—à§à¦¨à¦¿à§Ÿà¦¾ à¦¸à§à¦•à§‡à¦²</span>
+</button>
+<button class="flex flex-col items-center gap-1 min-w-[58px] p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">explore</span>
+<span class="font-label-sm text-[9px] text-on-surface font-semibold">à¦•à¦®à§à¦ªà¦¾à¦¸</span>
+</button>
+<button class="flex flex-col items-center gap-1 min-w-[58px] p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary">gesture</span>
+<span class="font-label-sm text-[9px] text-on-surface font-semibold">à¦¬à¦•à§à¦°à¦°à§‡à¦–à¦¾</span>
+</button>
+<button class="flex flex-col items-center gap-1 min-w-[58px] p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">content_cut</span>
+<span class="font-label-sm text-[9px] text-on-surface font-semibold">à¦¦à¦¾à¦— à¦•à¦°à§à¦¤à¦¨</span>
+</button>
+<button class="flex flex-col items-center gap-1 min-w-[58px] p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-error">picture_as_pdf</span>
+<span class="font-label-sm text-[9px] text-on-surface font-semibold">PDF à¦°à¦¿à¦ªà§‹à¦°à§à¦Ÿ</span>
+</button>
+</div>
+<!-- Main Heavy Duty CAD Viewport CTA Button -->
+<button class="w-full py-3 px-space-md rounded-lg bg-primary hover:bg-primary-container text-on-primary font-headline-md text-body-lg font-bold flex items-center justify-center gap-2 shadow-md active:scale-98 transition-transform" type="button">
+<span>CAD à¦ªà¦°à¦¿à¦®à¦¾à¦ª à¦•à§à¦¯à¦¾à¦¨à¦­à¦¾à¦¸à§‡ à¦ªà§à¦°à¦¬à§‡à¦¶ à¦•à¦°à§à¦¨</span>
+<span class="material-symbols-outlined text-[20px] text-secondary-fixed">arrow_forward</span>
+</button>
+</div>
+</div>
+</div></main><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-2px_12px_rgba(19,27,46,0.06)]" data-active-classes="text-primary font-bold"><div class="flex justify-around items-center h-16 px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[70px] h-12 transition-colors text-primary font-bold" data-path="mouza-map" href="#"><span class="material-symbols-outlined text-[22px]">map</span><span class="font-label-md text-label-md tracking-tight">à¦®à§Œà¦œà¦¾ à¦®à§à¦¯à¦¾à¦ª</span></a><a class="flex flex-col items-center justify-center min-w-[70px] h-12 text-on-surface-variant hover:text-primary transition-colors" data-path="dag-khatian" href="#"><span class="material-symbols-outlined text-[22px]">description</span><span class="font-label-md text-label-md tracking-tight">à¦¦à¦¾à¦— à¦“ à¦–à¦¤à¦¿à¦¯à¦¼à¦¾à¦¨</span></a><a class="flex flex-col items-center justify-center min-w-[70px] h-12 text-on-surface-variant hover:text-primary transition-colors" data-path="gps-rtk" href="#"><span class="material-symbols-outlined text-[22px]">satellite_alt</span><span class="font-label-md text-label-md tracking-tight">GPS / RTK</span></a><a class="flex flex-col items-center justify-center min-w-[70px] h-12 text-on-surface-variant hover:text-primary transition-colors" data-path="survey-tools" href="#"><span class="material-symbols-outlined text-[22px]">square_foot</span><span class="font-label-md text-label-md tracking-tight">à¦Ÿà§à¦²à¦¸ à¦“ à¦¹à¦¿à¦¸à¦¾à¦¬</span></a><a class="flex flex-col items-center justify-center min-w-[70px] h-12 text-on-surface-variant hover:text-primary transition-colors" data-path="records-archive" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-md text-label-md tracking-tight">à¦†à¦°à§à¦•à¦¾à¦‡à¦­</span></a></div></nav></body></html>

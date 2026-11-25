@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bdland_pro/features/tools/02_mouza_simple/mouza_map_simple_screen.dart';
 import 'package:bdland_pro/features/tools/04_anyshape_divider/anyshape_divider_screen.dart';
 import 'package:bdland_pro/features/tools/05_quadmaster/quadmaster_screen.dart';
 import 'package:bdland_pro/features/tools/19_hindu_inheritance/hindu_inheritance_screen.dart';
@@ -192,6 +194,36 @@ void main() {
       await tester.ensureVisible(addVertexBtn);
       await tester.tap(addVertexBtn);
       await tester.pumpAndSettle();
+    });
+  });
+
+  group('MouzaMapSimpleScreen Stitch Portal Tests', () {
+    testWidgets('Renders Stitch Cadastral Precision portal decks and opens CAD view', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(const MaterialApp(home: MouzaMapSimpleScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('সংরক্ষিত প্রজেক্ট ও ড্রাফট'), findsOneWidget);
+      expect(find.text('ডিভাইস থেকে'), findsOneWidget);
+      expect(find.text('ক্লাউড ডাটাবেস'), findsOneWidget);
+      expect(find.text('Total Station ও লাইভ GPS'), findsOneWidget);
+      expect(find.text('CAD ক্যানভাস ও জমি হিসাব'), findsOneWidget);
+
+      final ctaBtn = find.text('CAD পরিমাপ ক্যানভাসে প্রবেশ করুন');
+      expect(ctaBtn, findsOneWidget);
+      await tester.ensureVisible(ctaBtn);
+      await tester.tap(ctaBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      expect(find.text('অটো-ডিভিশন / বণ্টন'), findsOneWidget);
     });
   });
 }

@@ -1442,70 +1442,86 @@ $coords
   }
 
   // ==========================================
-  // VIEW 1: PORTAL & MAP LOADER (Image 5)
+  // VIEW 1: PORTAL & MAP LOADER (Stitch Cadastral Precision Design)
   // ==========================================
   Widget _buildPortalView() {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFFAF8FF),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF004126),
+        foregroundColor: Colors.white,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         title: PopupMenuButton<String>(
-          onSelected: (val) {
-            setState(() {
-              _activeMouza = val;
-            });
-          },
+          onSelected: (val) => setState(() => _activeMouza = val),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
-                child: Text(
-                  _activeMouza,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _activeMouza.replaceFirst('মৌজা: ', ''),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, color: Color(0xFFFFDEA3), size: 18),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFC64D).withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _activeSheet,
+                            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Color(0xFFFFDEA3)),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            _selectedScale,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10, color: Color(0xFF8ACFA4)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 20),
             ],
           ),
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(value: 'মৌজা: আমিনপুর (জে.এল. ৩৪)', child: Text('আমিনপুর (জে.এল. ৩৪)')),
-            const PopupMenuItem(value: 'মৌজা: রূপগঞ্জ (জে.এল. ১২)', child: Text('রূপগঞ্জ (জে.এল. ১২)')),
-            const PopupMenuItem(value: 'মৌজা: তেজগাঁও (জে.এল. ০৮)', child: Text('তেজগাঁও (জে.এল. ০৮)')),
+          itemBuilder: (ctx) => const [
+            PopupMenuItem(value: 'মৌজা: আমিনপুর (জে.এল. ৩৪)', child: Text('আমিনপুর (জে.এল. ৩৪)')),
+            PopupMenuItem(value: 'মৌজা: রূপগঞ্জ (জে.এল. ১২)', child: Text('রূপগঞ্জ (জে.এল. ১২)')),
+            PopupMenuItem(value: 'মৌজা: তেজগাঁও (জে.এল. ০৮)', child: Text('তেজগাঁও (জে.এল. ০৮)')),
           ],
         ),
         actions: [
-          // Blue active map button
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-            child: GestureDetector(
-              onTap: () => setState(() => _viewMode = MouzaViewMode.cad),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.map, color: Colors.white, size: 18),
-                  ],
-                ),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.layers_outlined, color: Color(0xFF93CCFF)),
+            tooltip: 'CAD ক্যানভাস খুলুন',
+            onPressed: () => setState(() => _viewMode = MouzaViewMode.cad),
           ),
           IconButton(
-            icon: const Icon(Icons.add_box_outlined, color: Color(0xFF334155), size: 22),
-            tooltip: 'নতুন প্রজেক্ট',
+            icon: const Icon(Icons.grid_4x4),
+            tooltip: 'নতুন প্রজেক্ট শুরু করুন',
             onPressed: () {
               setState(() {
                 _measuredPoints = [
@@ -1514,364 +1530,1083 @@ $coords
                   const Offset(280, 220),
                   const Offset(40, 200),
                 ];
+                _recompute();
                 _viewMode = MouzaViewMode.cad;
               });
             },
           ),
-          IconButton(
-            icon: Icon(
-              _highContrast ? Icons.lightbulb : Icons.lightbulb_outline,
-              color: _highContrast ? Colors.amber : const Color(0xFF334155),
-              size: 22,
-            ),
-            tooltip: 'কন্ট্রাস্ট / ব্রাইটনেস',
-            onPressed: () => setState(() => _highContrast = !_highContrast),
-          ),
-          IconButton(
-            icon: const Icon(Icons.help_outline, color: Color(0xFF334155), size: 22),
-            tooltip: 'নির্দেশিকা',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('মৌজা ম্যাপ ব্যবহারের নিয়ম'),
-                  content: const Text('১. "Cloud থেকে" অথবা "Device থেকে" ম্যাপ নির্বাচন করুন।\n২. ক্যানভাসে দাগের চারকোণা ড্র্যাগ করে মাপুন।\n৩. গুনিয়া স্কেল চালু করে দাগের বাহু সরাসরি যাচাই করুন।'),
-                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ঠিক আছে'))],
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_book_outlined, color: Color(0xFFDC2626), size: 22),
-            tooltip: 'ব্যবহারবিধি গাইড',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('মৌজা CAD ব্যবহারবিধি'),
-                  content: const Text(
-                    '১. "Cloud থেকে" বা "Device থেকে" আসল মৌজা নকশা শিট লোড করুন।\n'
-                    '২. ক্যালিব্রেশন আইকন (📐) দিয়ে বিন্দু ১→২ রেখার বাস্তব লিংক/ফুট দূরত্ব সেট করুন।\n'
-                    '৩. শীর্ষবিন্দুগুলো ড্র্যাগ করলে ম্যাগনিফায়ার লুপ ও অর্থো-স্ন্যাপিং সহ নিখুঁত পরিমাপ পাবেন।\n'
-                    '৪. সেভ ও PDF/DXF/KML এক্সপোর্ট সরাসরি ব্যবহার করুন।',
-                  ),
-                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি'))],
-                ),
-              );
-            },
-          ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF334155)),
+            icon: const Icon(Icons.more_vert),
             onSelected: (val) {
               if (val == 'cloud') {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AllMouzaMapsScreen()));
+              } else if (val == 'device') {
+                _openDeviceFilePicker();
+              } else if (val == 'guide') {
+                _showPortalGuideDialog();
               }
-              if (val == 'device') _openDeviceFilePicker();
             },
             itemBuilder: (ctx) => const [
               PopupMenuItem(value: 'cloud', child: Text('সকল মৌজা ডিরেক্টরি')),
-              PopupMenuItem(value: 'device', child: Text('ফাইল খুলুন')),
+              PopupMenuItem(value: 'device', child: Text('ডিভাইস থেকে ফাইল খুলুন')),
+              PopupMenuItem(value: 'guide', child: Text('ব্যবহারবিধি গাইড')),
             ],
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Background engineering grid
           CustomPaint(
             painter: _EngineeringGridPainter(),
             size: Size.infinite,
           ),
-
           ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.only(bottom: 28),
             children: [
-              // SECTION 1: সংরক্ষিত প্রজেক্ট (Image 5)
-              _buildSectionHeader('সংরক্ষিত প্রজেক্ট', null),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
-                  ],
-                ),
+              _buildPortalActiveHud(),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.folder_open_outlined, size: 54, color: Color(0xFF64748B)),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'সংরক্ষিত প্রজেক্ট দেখতে ফোনের BDLandPro ফোল্ডারটি একবার বেছে দিন।',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                    ),
+                    _buildPortalSavedProjectsCard(),
+                    const SizedBox(height: 18),
+                    _buildPortalLoadSheetSection(),
                     const SizedBox(height: 16),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        shape: const StadiumBorder(),
-                        side: const BorderSide(color: Color(0xFF166534)),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                      ),
-                      onPressed: _showSavedProjectsModal,
-                      child: const Text(
-                        'ফোল্ডার বেছে নিন',
-                        style: TextStyle(color: Color(0xFF166534), fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
+                    _buildPortalQualityCard(),
+                    const SizedBox(height: 16),
+                    _buildPortalInstrumentDeck(),
+                    const SizedBox(height: 16),
+                    _buildPortalCadPreviewCard(),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // SECTION 2: মৌজা নকশা লোড (Image 5)
-              _buildSectionHeader('মৌজা নকশা লোড', 'নতুন কাজ শুরু করুন'),
-              const SizedBox(height: 8),
-
-              // Item A: Device থেকে
-              InkWell(
-                onTap: _openDeviceFilePicker,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF14532D), // Dark emerald green
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.upload_file, color: Colors.white, size: 26),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Device থেকে',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'ফোনের JPG · PDF · TIFF নকশা খুলুন',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: const Icon(Icons.arrow_forward, size: 16, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Item B: Cloud থেকে (Navigates to AllMouzaMapsScreen - Image 5)
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AllMouzaMapsScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7), // Mint green
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.cloud_outlined, color: Color(0xFF166534), size: 26),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cloud থেকে',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'সারাদেশের মৌজা ম্যাপ থেকে বাছুন (free.mouzamap.tech)',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: const Icon(Icons.arrow_forward, size: 16, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // SECTION 3: ম্যাপের মান (Image 5)
-              Row(
-                children: [
-                  const Text('ম্যাপের মান', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                  const SizedBox(width: 14),
-                  // Option 1: HD Full Quality
-                  InkWell(
-                    onTap: () => setState(() => _isHighQuality = true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: _isHighQuality ? const Color(0xFF14532D) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _isHighQuality ? const Color(0xFF14532D) : const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.hd, size: 16, color: _isHighQuality ? Colors.white : const Color(0xFF64748B)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'ফুল কোয়ালিটি',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _isHighQuality ? FontWeight.bold : FontWeight.normal,
-                              color: _isHighQuality ? Colors.white : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Option 2: Fast
-                  InkWell(
-                    onTap: () => setState(() => _isHighQuality = false),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: !_isHighQuality ? const Color(0xFF14532D) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: !_isHighQuality ? const Color(0xFF14532D) : const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.bolt, size: 16, color: !_isHighQuality ? Colors.white : const Color(0xFF64748B)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'দ্রুত',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: !_isHighQuality ? FontWeight.bold : FontWeight.normal,
-                              color: !_isHighQuality ? Colors.white : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'সবচেয়ে পরিষ্কার · একটু ধীর, বেশি মেমরি',
-                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-              ),
-
-              const SizedBox(height: 20),
-
-              // SECTION 4: টোটাল স্টেশন / RTK (Image 5)
-              _buildSectionHeader('টোটাল স্টেশন / RTK', 'পয়েন্ট দিয়ে কাজ'),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: _showTotalStationDialog,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.pin_drop, color: Color(0xFFB45309), size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'টোটাল স্টেশন সার্ভে ডাটা লোড',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Northing & Easting দিয়ে সরাসরি CAD বাউন্ডারি আঁকুন',
-                              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF94A3B8)),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPortalGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('মৌজা CAD ব্যবহারবিধি'),
+        content: const Text(
+          '১. "ডিভাইস থেকে" অথবা "ক্লাউড ডাটাবেস" থেকে আসল মৌজা নকশা শিট লোড করুন।\n'
+          '২. ক্যালিব্রেশন (📏) দিয়ে বিন্দু ১→২ রেখার বাস্তব লিংক/ফুট দূরত্ব সেট করুন।\n'
+          '৩. CAD ক্যানভাসে জুম/প্যান ও ম্যাগনিফায়ার লুপ ব্যবহার করে সূক্ষ্মভাবে দাগ মাপুন।\n'
+          '৪. অটো-ডিভিশন, হিস্যা বণ্টন ও বাংলা PDF/DXF/KML এক্সপোর্ট ব্যবহার করুন।',
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বুঝেছি'))],
+      ),
+    );
+  }
+
+  Widget _buildPortalActiveHud() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _activeMouza,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF004126)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$_activeSheet • গান্টার স্কেল ক্যালিব্রেশন প্রস্তুত',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF404942)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _hudSquareBtn(
+                icon: Icons.gps_fixed,
+                bg: const Color(0xFFE0F2FE),
+                fg: const Color(0xFF003B5D),
+                tooltip: 'লাইভ ডিভাইস GPS',
+                onTap: _showGpsLocationDialog,
+              ),
+              const SizedBox(width: 6),
+              _hudSquareBtn(
+                icon: Icons.edit_note,
+                bg: const Color(0xFFEAEDFF),
+                fg: const Color(0xFF131B2E),
+                tooltip: 'CAD ক্যানভাসে যান',
+                onTap: () => setState(() => _viewMode = MouzaViewMode.cad),
+              ),
+              const SizedBox(width: 6),
+              _hudSquareBtn(
+                icon: _highContrast ? Icons.contrast : Icons.brightness_6_outlined,
+                bg: _highContrast ? const Color(0xFFFFDEA3) : const Color(0xFFEAEDFF),
+                fg: _highContrast ? const Color(0xFF5D4200) : const Color(0xFF404942),
+                tooltip: 'হাই কন্ট্রাস্ট মোড',
+                onTap: () => setState(() => _highContrast = !_highContrast),
+              ),
+              const SizedBox(width: 6),
+              _hudSquareBtn(
+                icon: Icons.help_outline,
+                bg: const Color(0xFFFFDAD6).withValues(alpha: 0.6),
+                fg: const Color(0xFFBA1A1A),
+                tooltip: 'ব্যবহারবিধি',
+                onTap: _showPortalGuideDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F3FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.tune, size: 14, color: Color(0xFF004126)),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'স্কেল মানদণ্ড: $_selectedScale (১০০ লিংক)',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF004126)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Text(
+                  'EPSG: 3106 (BTM)',
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF404942)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hudSquareBtn({
+    required IconData icon,
+    required Color bg,
+    required Color fg,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, size: 18, color: fg),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortalSavedProjectsCard() {
+    final previewItems = _savedProjects.take(2).toList();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 5, color: const Color(0xFFFFC64D)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFDEA3),
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: const Icon(Icons.folder_special, size: 16, color: Color(0xFF261900)),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'সংরক্ষিত প্রজেক্ট ও ড্রাফট',
+                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF131B2E)),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAEDFF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${BanglaNumerals.toBangla(_savedProjects.length)}টি প্রস্তুত',
+                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF004126)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'পূর্বে সেভ করা ক্যাডাস্ট্রাল প্রজেক্ট সরাসরি খুলুন বা নতুন ফোল্ডার নির্বাচন করুন।',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF404942), height: 1.4),
+                    ),
+                    const SizedBox(height: 10),
+                    for (final proj in previewItems) ...[
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _activeMouza = proj['name'] as String;
+                            _measuredPoints = List.from(proj['points'] as List<Offset>);
+                            if (proj['imageUrl'] != null) {
+                              _customSheetImageUrl = proj['imageUrl'] as String;
+                              _showScannedSheet = true;
+                            }
+                            _recompute();
+                            _viewMode = MouzaViewMode.cad;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAEDFF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description_outlined, size: 18, color: Color(0xFF004126)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      proj['name'] as String,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF131B2E)),
+                                    ),
+                                    Text(
+                                      '${proj['location']} • ${proj['date']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF404942)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${BanglaFormatter.formatNumber((proj['areaDec'] as num).toDouble(), fractionDigits: 2)} শতক',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7A5900)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE2E7FF),
+                          foregroundColor: const Color(0xFF004126),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _showSavedProjectsModal,
+                        icon: const Icon(Icons.snippet_folder_outlined, size: 18),
+                        label: const Text(
+                          'সব প্রজেক্ট / ফোল্ডার বেছে নিন',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortalLoadSheetSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('মৌজা নকশা যুক্ত করুন (Load Sheet)', 'Raster & Vector'),
+        const SizedBox(height: 10),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F5A38),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.upload_file, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E7FF),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'JPG • PDF • PNG',
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF004126)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ডিভাইস থেকে',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF131B2E)),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'স্ক্যান করা আমিন নকশা বা হাই-রেজোলিউশন ইমেজ/PDF যুক্ত করুন।',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11, color: Color(0xFF404942), height: 1.35),
+                      ),
+                      const Spacer(),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF004126),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _openDeviceFilePicker,
+                          icon: const Icon(Icons.file_open_outlined, size: 15),
+                          label: const Text('ফাইল বাছুন', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFC64D),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.cloud_download_outlined, color: Color(0xFF725200), size: 22),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFDEA3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'CS • SA • RS • BS জরিপ',
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF261900)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ক্লাউড ডাটাবেস',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF131B2E)),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'বাংলাদেশের ৬৪ জেলার ডিজিটাল রেকর্ড ও অনলাইন সার্ভে পোর্টাল।',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11, color: Color(0xFF404942), height: 1.35),
+                      ),
+                      const Spacer(),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFC64D),
+                            foregroundColor: const Color(0xFF725200),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const AllMouzaMapsScreen()));
+                          },
+                          icon: const Icon(Icons.travel_explore, size: 15),
+                          label: const Text('মৌজা খুঁজুন', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortalQualityCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.view_in_ar_outlined, size: 18, color: Color(0xFF004126)),
+                  SizedBox(width: 6),
+                  Text('ম্যাপ রেন্ডার মান', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF131B2E))),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(color: Color(0xFF003B5D), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _isHighQuality ? 'HD রেন্ডারিং' : 'লাইট মেমোরি',
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF003B5D)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAEDFF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _isHighQuality = true),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: _isHighQuality ? const Color(0xFF004126) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.verified_outlined, size: 14, color: _isHighQuality ? const Color(0xFFFFDEA3) : const Color(0xFF404942)),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'HD ফুল কোয়ালিটি',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isHighQuality ? Colors.white : const Color(0xFF404942),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'আসল রেজোলিউশন ও নিখুঁত জুম',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: _isHighQuality ? const Color(0xFF8ACFA4) : const Color(0xFF404942),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _isHighQuality = false),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: !_isHighQuality ? const Color(0xFF004126) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.bolt, size: 14, color: !_isHighQuality ? const Color(0xFFFFDEA3) : const Color(0xFF404942)),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'দ্রুত মোড (Fast)',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: !_isHighQuality ? Colors.white : const Color(0xFF404942),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'কম মেমরিতে দ্রুত লোডিং',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: !_isHighQuality ? const Color(0xFF8ACFA4) : const Color(0xFF404942),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.layers, size: 18, color: Color(0xFF7A5900)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ব্যাকগ্রাউন্ড মৌজা নকশা শিট দেখান',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF131B2E)),
+                    ),
+                    Text(
+                      'CAD গ্রিডের নিচে স্ক্যানড শিট ওভারলে চালু/বন্ধ',
+                      style: TextStyle(fontSize: 10.5, color: Color(0xFF404942)),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _showScannedSheet,
+                activeThumbColor: const Color(0xFF004126),
+                onChanged: (v) => setState(() => _showScannedSheet = v),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPortalInstrumentDeck() {
+    final gps = _lastGpsResult;
+    final hasGps = gps != null && gps.success && gps.latitude != null && gps.longitude != null;
+    final centroid = _measuredPoints.isNotEmpty
+        ? _measuredPoints.reduce((a, b) => a + b) / _measuredPoints.length.toDouble()
+        : Offset.zero;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF283044),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.14), blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.satellite_alt, size: 18, color: Color(0xFF93CCFF)),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Total Station ও লাইভ GPS',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: hasGps ? const Color(0xFF0F5A38) : const Color(0xFF00537F),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  hasGps
+                      ? 'GPS: ±${gps.accuracyMeters?.toStringAsFixed(1) ?? "?"} মি.'
+                      : 'N,E / GPS প্রস্তুত',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFCCE5FF)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  hasGps ? 'ডিভাইস লোকেশন সক্রিয়' : 'মোড: কাস্টম (N, E) বা ডিভাইস GPS',
+                  style: const TextStyle(fontSize: 10.5, color: Color(0xFFD2D9F4)),
+                ),
+                Text(
+                  'কোণ: ${BanglaNumerals.toBangla(_measuredPoints.length)} টি',
+                  style: const TextStyle(fontSize: 10.5, color: Color(0xFFD2D9F4)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _telemetryTile(
+                hasGps ? 'অক্ষাংশ (Lat)' : 'কেন্দ্র (X px)',
+                hasGps ? gps.latitude!.toStringAsFixed(5) : (centroid.dx * _feetPerPixel).toStringAsFixed(1),
+                hasGps ? 'ডিগ্রি' : 'ফুট',
+                const Color(0xFF34D399),
+              ),
+              const SizedBox(width: 8),
+              _telemetryTile(
+                hasGps ? 'দ্রাঘিমাংশ (Lng)' : 'কেন্দ্র (Y px)',
+                hasGps ? gps.longitude!.toStringAsFixed(5) : (centroid.dy * _feetPerPixel).toStringAsFixed(1),
+                hasGps ? 'ডিগ্রি' : 'ফুট',
+                const Color(0xFFF6BE45),
+              ),
+              const SizedBox(width: 8),
+              _telemetryTile(
+                hasGps ? 'নির্ভুলতা (±)' : 'পরিসীমা',
+                hasGps ? (gps.accuracyMeters?.toStringAsFixed(1) ?? '--') : _totalPerimeterFt.toStringAsFixed(1),
+                hasGps ? 'মিটার' : 'ফুট',
+                const Color(0xFF93CCFF),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F5A38),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _showTotalStationDialog,
+                  icon: const Icon(Icons.add_location_alt_outlined, size: 15),
+                  label: const Text('পয়েন্ট যোগ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _showGpsLocationDialog,
+                  icon: const Icon(Icons.my_location, size: 15),
+                  label: const Text('লাইভ GPS', style: TextStyle(fontSize: 11.5)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _exportKml,
+                  icon: const Icon(Icons.file_upload_outlined, size: 15),
+                  label: const Text('KML', style: TextStyle(fontSize: 11.5)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _telemetryTile(String label, String value, String unit, Color valColor) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 2),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: valColor)),
+            Text(unit, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortalCadPreviewCard() {
+    final dec = _totalAreaSqFt / 435.60;
+    final katha = _totalAreaSqFt / 720.00;
+    final acre = _totalAreaSqFt / 43560.0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF131B2E).withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.square_foot, size: 20, color: Color(0xFF004126)),
+                  SizedBox(width: 6),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('CAD ক্যানভাস ও জমি হিসাব', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF131B2E))),
+                      Text('লাইভ বাউন্ডারি অ্যানালাইসিস', style: TextStyle(fontSize: 10.5, color: Color(0xFF404942))),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAEDFF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'বিন্দু: ${BanglaNumerals.toBangla(_measuredPoints.length)} টি',
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF7A5900)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Brass Gunia Scale visual strip
+          InkWell(
+            onTap: () {
+              setState(() {
+                _showGuniaScale = true;
+                _viewMode = MouzaViewMode.cad;
+              });
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F3FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('পিতলের গুনিয়া স্কেল (Gunia Scale)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF004126))),
+                      Text('১০০ লিংক = ৬৬ ফুট', style: TextStyle(fontSize: 10.5, color: Color(0xFF404942))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFDEA3).withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: List.generate(17, (i) {
+                              final h = i % 4 == 0 ? 18.0 : (i % 2 == 0 ? 12.0 : 8.0);
+                              return Container(
+                                width: 2,
+                                height: h,
+                                color: i % 4 == 0
+                                    ? const Color(0xFF7A5900)
+                                    : const Color(0xFF7A5900).withValues(alpha: 0.55),
+                              );
+                            }),
+                          ),
+                        ),
+                        Center(
+                          child: Container(width: 2, height: 28, color: const Color(0xFFBA1A1A)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('০ লিংক', style: TextStyle(fontSize: 9, color: Color(0xFF404942))),
+                      Text('৫০ লিংক', style: TextStyle(fontSize: 9, color: Color(0xFF404942))),
+                      Text('১০০ লিংক', style: TextStyle(fontSize: 9, color: Color(0xFF404942))),
+                      Text('১৫০ লিংক', style: TextStyle(fontSize: 9, color: Color(0xFF404942))),
+                      Text('২০০ লিংক', style: TextStyle(fontSize: 9, color: Color(0xFF404942))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 4-Unit Real-time Area Matrix
+          Row(
+            children: [
+              _areaMetricChip('শতক (Decimal)', BanglaFormatter.formatNumber(dec, fractionDigits: 2)),
+              const SizedBox(width: 8),
+              _areaMetricChip('কাঠা (Katha)', BanglaFormatter.formatNumber(katha, fractionDigits: 2)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _areaMetricChip('একর (Acre)', BanglaFormatter.formatNumber(acre, fractionDigits: 3)),
+              const SizedBox(width: 8),
+              _areaMetricChip('বর্গফুট (Sq.Ft)', BanglaFormatter.formatNumber(_totalAreaSqFt, fractionDigits: 1)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Quick CAD Operations Row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _quickCadOpBtn(Icons.straighten, 'গুনিয়া স্কেল', const Color(0xFF004126), () {
+                  setState(() {
+                    _showGuniaScale = true;
+                    _viewMode = MouzaViewMode.cad;
+                  });
+                }),
+                const SizedBox(width: 8),
+                _quickCadOpBtn(Icons.tune, 'ক্যালিব্রেট', const Color(0xFF7A5900), _showCalibrationDialog),
+                const SizedBox(width: 8),
+                _quickCadOpBtn(Icons.map_outlined, 'নকশা শিট', const Color(0xFF003B5D), _showSheetSelectorModal),
+                const SizedBox(width: 8),
+                _quickCadOpBtn(Icons.content_cut, 'দাগ কর্তন', const Color(0xFF004126), () {
+                  setState(() => _viewMode = MouzaViewMode.cad);
+                  _showAutoDivisionDialog();
+                }),
+                const SizedBox(width: 8),
+                _quickCadOpBtn(Icons.picture_as_pdf_outlined, 'PDF রিপোর্ট', const Color(0xFFBA1A1A), _exportPdf),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Primary CAD Canvas CTA
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF004126),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => setState(() => _viewMode = MouzaViewMode.cad),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('CAD পরিমাপ ক্যানভাসে প্রবেশ করুন', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward, size: 18, color: Color(0xFFFFDEA3)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _areaMetricChip(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAEDFF),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: Color(0xFF404942))),
+            ),
+            const SizedBox(width: 4),
+            Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF004126))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickCadOpBtn(IconData icon, String label, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 66,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAEDFF),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Color(0xFF131B2E)),
+            ),
+          ],
+        ),
       ),
     );
   }
