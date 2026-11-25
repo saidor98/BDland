@@ -4,8 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/device_file_service.dart';
@@ -65,42 +63,13 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
       Uint8List? pngBytes;
       final boundary = _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary != null) {
-        final image = await boundary.toImage(pixelRatio: 2.5);
+        final image = await boundary.toImage(pixelRatio: 2.0);
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
         pngBytes = byteData?.buffer.asUint8List();
       }
 
-      final theme = await PdfReportHelper.loadBengaliTheme();
-      final pdf = pw.Document(theme: theme);
       final sheetALabel = _labelFor(_sheetAAsset, 'শিট ১');
       final sheetBLabel = _labelFor(_sheetBAsset, 'শিট ২');
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(24),
-          build: (pw.Context ctx) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('BDLandPro সংযুক্ত মৌজা ম্যাপ (Map Joint Sheet)', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  'বাম শিট: $sheetALabel | ডান শিট: $sheetBLabel | অনুভূমিক মিল: ${_horizontalOverlap.toStringAsFixed(0)} px | উল্লম্ব: ${_verticalAlignment.toStringAsFixed(0)} px | ঘূর্ণন: ${_sheetBRotation.toStringAsFixed(1)} deg',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                pw.SizedBox(height: 10),
-                if (pngBytes != null)
-                  pw.Expanded(
-                    child: pw.Center(
-                      child: pw.Image(pw.MemoryImage(pngBytes), fit: pw.BoxFit.contain),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      );
 
       await HistoryService.instance.saveItem(
         CalculationHistoryItem(
@@ -114,9 +83,28 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
         ),
       );
 
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'BDLandPro_Joint_Mouza_Map.pdf',
+      final esc = PdfReportHelper.escapeHtml;
+      final imgTag = pngBytes != null
+          ? '<div class="image-box"><img src="${PdfReportHelper.pngBytesToDataUri(pngBytes)}" /></div>'
+          : '<div class="info-panel">ম্যাপ জয়েন্ট ক্যানভাস প্রিভিউ</div>';
+
+      final html = PdfReportHelper.buildCadastralHtmlDocument(
+        title: 'সংযুক্ত মৌজা ম্যাপ শিট (Map Joint)',
+        subtitle: 'বাম শিট: ${esc(sheetALabel)} • ডান শিট: ${esc(sheetBLabel)}',
+        badgeText: 'ল্যান্ডস্কেপ A4',
+        bodyHtml: '''
+          <div class="info-panel">
+            <strong>সংযোজন প্যারামিটার:</strong> অনুভূমিক মিল ${_horizontalOverlap.toStringAsFixed(0)} px •
+            উল্লম্ব ${_verticalAlignment.toStringAsFixed(0)} px • ঘূর্ণন ${_sheetBRotation.toStringAsFixed(1)}°
+          </div>
+          $imgTag
+        ''',
+      );
+
+      await PdfReportHelper.printHtmlPdf(
+        html: html,
+        pageFormat: PdfPageFormat.a4.landscape,
+        jobName: 'BDLandPro_Joint_Mouza_Map.pdf',
       );
     } catch (e) {
       if (mounted) {

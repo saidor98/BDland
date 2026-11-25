@@ -35,15 +35,26 @@ class SidebarDrawer extends StatelessWidget {
           const SizedBox(height: 16),
           // App Logo / Icon Header
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: AppColors.primaryGreen.withOpacity(0.08),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.22),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: const Icon(
-              Icons.landscape,
-              color: AppColors.primaryGreen,
-              size: 28,
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: AppColors.primaryGreen,
+                child: Icon(Icons.landscape, color: Colors.white, size: 28),
+              ),
             ),
           ),
           const SizedBox(height: 20),

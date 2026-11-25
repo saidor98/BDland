@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,9 +8,9 @@ import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 
 /// Universal Mouza sheet viewer widget supporting:
-/// 1) Local raster assets (`assets/...jpg`, `.png`)
-/// 2) Local PDF assets (`assets/...pdf` via `Printing.raster`)
-/// 3) Network JPG/PNG OR Network PDF (`free.mouzamap.tech/download.aspx?...`)
+/// 1) Local raster assets (`assets/...jpg`, `.png`) decoded with safe memory cap (`cacheWidth`)
+/// 2) Local PDF assets (`assets/...pdf` via two-tier bounded DPI `Printing.raster` — prevents Android OOM crashes!)
+/// 3) Network JPG/PNG OR Network PDF (`free.mouzamap.tech/download.aspx?...`) with throttled progress updates
 /// 4) Local device filesystem files (JPG/PNG/PDF)
 /// Never silently substitutes a sample sheet when an actual load fails.
 class MouzaSheetImage extends StatefulWidget {
@@ -17,6 +18,7 @@ class MouzaSheetImage extends StatefulWidget {
   final BoxFit fit;
   final int pdfPageIndex;
   final double pdfDpi;
+  final int maxDecodeWidth;
   final VoidCallback? onRetry;
   final Widget? errorFallback;
 
@@ -25,7 +27,8 @@ class MouzaSheetImage extends StatefulWidget {
     required this.source,
     this.fit = BoxFit.contain,
     this.pdfPageIndex = 0,
-    this.pdfDpi = 150.0,
+    this.pdfDpi = 120.0,
+    this.maxDecodeWidth = 2048,
     this.onRetry,
     this.errorFallback,
   });
@@ -43,6 +46,7 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
   int _loadedBytes = 0;
   int? _totalBytes;
   int _reloadToken = 0;
+  int _loadEpoch = 0;
 
   @override
   void initState() {
@@ -54,7 +58,8 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
   void didUpdateWidget(covariant MouzaSheetImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source ||
-        oldWidget.pdfPageIndex != widget.pdfPageIndex) {
+        oldWidget.pdfPageIndex != widget.pdfPageIndex ||
+        oldWidget.maxDecodeWidth != widget.maxDecodeWidth) {
       _loadSource();
     }
   }
@@ -70,8 +75,10 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
   }
 
   Future<void> _loadSource() async {
+    final epoch = ++_loadEpoch;
     final src = widget.source.trim();
     if (src.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'কোনো ম্যাপ সোর্স দেওয়া হয়নি';
         _isLoading = false;
@@ -79,8 +86,9 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
       return;
     }
 
-    // Fast path for non-PDF asset images: direct Image.asset
+    // Fast path for non-PDF bundled raster assets: direct Image.asset with safe cacheWidth
     if (src.startsWith('assets/') && !src.toLowerCase().endsWith('.pdf')) {
+      if (!mounted) return;
       setState(() {
         _imageBytes = null;
         _isLoading = false;
@@ -91,6 +99,7 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
 
     final cached = _memoryCache[_cacheKey];
     if (cached != null) {
+      if (!mounted) return;
       setState(() {
         _imageBytes = cached;
         _isLoading = false;
@@ -112,7 +121,7 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
         final data = await rootBundle.load(src);
         rawBytes = data.buffer.asUint8List();
       } else if (src.startsWith('http://') || src.startsWith('https://')) {
-        rawBytes = await _downloadWithProgress(src);
+        rawBytes = await _downloadWithProgress(src, epoch);
       } else {
         final file = File(src);
         if (!await file.exists()) {
@@ -121,41 +130,42 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
         rawBytes = await file.readAsBytes();
       }
 
+      if (epoch != _loadEpoch || !mounted) return;
+
       if (rawBytes.isEmpty) {
         throw Exception('ফাইলটি খালি বা ডাউনলোড অসম্পূর্ণ');
       }
 
       Uint8List finalImageBytes;
       if (_isPdfMagic(rawBytes) || src.toLowerCase().endsWith('.pdf')) {
-        finalImageBytes = await _rasterizePdfPage(rawBytes, widget.pdfPageIndex);
+        finalImageBytes = await _rasterizePdfPageSafe(rawBytes, widget.pdfPageIndex);
       } else {
         finalImageBytes = rawBytes;
       }
 
-      // Bound cache size
-      if (_memoryCache.length >= 6) {
+      if (epoch != _loadEpoch || !mounted) return;
+
+      // Bound cache size tightly (2 entries max so high-res mouza sheets never pressure RAM)
+      while (_memoryCache.length >= 2) {
         _memoryCache.remove(_memoryCache.keys.first);
       }
       _memoryCache[_cacheKey] = finalImageBytes;
 
-      if (mounted) {
-        setState(() {
-          _imageBytes = finalImageBytes;
-          _isLoading = false;
-          _errorMessage = null;
-        });
-      }
+      setState(() {
+        _imageBytes = finalImageBytes;
+        _isLoading = false;
+        _errorMessage = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
+      if (epoch != _loadEpoch || !mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
-  Future<Uint8List> _downloadWithProgress(String url) async {
+  Future<Uint8List> _downloadWithProgress(String url, int epoch) async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 15);
     client.badCertificateCallback = (cert, host, port) => true;
@@ -176,16 +186,20 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
       }
 
       final total = resp.contentLength > 0 ? resp.contentLength : null;
-      if (mounted) {
+      if (mounted && epoch == _loadEpoch) {
         setState(() => _totalBytes = total);
       }
 
       final builder = BytesBuilder(copy: false);
       int loaded = 0;
+      int lastNotifyMs = 0;
       await for (final chunk in resp) {
+        if (epoch != _loadEpoch) break;
         builder.add(chunk);
         loaded += chunk.length;
-        if (mounted) {
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        if (mounted && (nowMs - lastNotifyMs) >= 120) {
+          lastNotifyMs = nowMs;
           setState(() => _loadedBytes = loaded);
         }
       }
@@ -195,15 +209,45 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
     }
   }
 
-  Future<Uint8List> _rasterizePdfPage(Uint8List pdfBytes, int pageIndex) async {
+  /// Safe two-tier PDF rasterization preventing native OOM crashes on large A0/A1 Mouza PDFs:
+  /// Probes page size at low 42 DPI first (~3-8 MB), then caps resolution to <= maxDecodeWidth (~2048 px)
+  /// instead of blindly calling dpi=150 which allocates 100-300+ MB native Pdfium bitmaps on large sheets!
+  Future<Uint8List> _rasterizePdfPageSafe(Uint8List pdfBytes, int pageIndex) async {
+    const double probeDpi = 42.0;
+    PdfRaster? probePage;
+
     await for (final page in Printing.raster(
       pdfBytes,
       pages: [pageIndex],
-      dpi: widget.pdfDpi,
+      dpi: probeDpi,
+    )) {
+      probePage = page;
+      break;
+    }
+
+    if (probePage == null) {
+      throw Exception('PDF পেজ রেন্ডার করা সম্ভব হয়নি');
+    }
+
+    final maxSide = math.max(probePage.width, probePage.height).toDouble();
+    final targetMaxPx = widget.maxDecodeWidth.toDouble().clamp(1000.0, 2200.0);
+
+    // If probe at 42 DPI is already large (>= 1300px, e.g. A0/A1 Mouza scan), refine safely up to targetMaxPx
+    final safeDpi = (probeDpi * (targetMaxPx / math.max(maxSide, 1.0))).clamp(36.0, widget.pdfDpi);
+
+    if ((safeDpi - probeDpi).abs() < 12.0 && maxSide >= 900) {
+      return await probePage.toPng();
+    }
+
+    await for (final page in Printing.raster(
+      pdfBytes,
+      pages: [pageIndex],
+      dpi: safeDpi,
     )) {
       return await page.toPng();
     }
-    throw Exception('PDF পেজ রেন্ডার করা সম্ভব হয়নি');
+
+    return await probePage.toPng();
   }
 
   void _retry() {
@@ -216,12 +260,16 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
   @override
   Widget build(BuildContext context) {
     final src = widget.source.trim();
+    final safeCacheWidth = widget.maxDecodeWidth.clamp(600, 2200);
 
     if (src.startsWith('assets/') && !src.toLowerCase().endsWith('.pdf')) {
       return Image.asset(
         src,
-        key: ValueKey('asset_${src}_$_reloadToken'),
+        key: ValueKey('asset_${src}_${safeCacheWidth}_$_reloadToken'),
         fit: widget.fit,
+        cacheWidth: safeCacheWidth,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
         errorBuilder: (ctx, err, stack) => widget.errorFallback ?? _buildErrorWidget('অ্যাসেট শিট লোড হয়নি'),
       );
     }
@@ -264,8 +312,11 @@ class _MouzaSheetImageState extends State<MouzaSheetImage> {
 
     return Image.memory(
       _imageBytes!,
-      key: ValueKey('mem_${_cacheKey}_$_reloadToken'),
+      key: ValueKey('mem_${_cacheKey}_${safeCacheWidth}_$_reloadToken'),
       fit: widget.fit,
+      cacheWidth: safeCacheWidth,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
       errorBuilder: (ctx, err, stack) => widget.errorFallback ?? _buildErrorWidget('ছবি ডিকোড করা যায়নি'),
     );
   }

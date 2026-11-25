@@ -3,9 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/location_service.dart';
@@ -916,62 +913,43 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   }
 
   Future<void> _exportPdf() async {
-    final theme = await PdfReportHelper.loadBengaliTheme();
-    final pdf = pw.Document(theme: theme);
     final decimal = _areaSqFt / 435.60;
     final katha = _areaSqFt / 720.00;
     final bigha = decimal / 33.0;
+    final esc = PdfReportHelper.escapeHtml;
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        build: (pw.Context ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                'BDLandPro স্যাটেলাইট ও GPS ভূমি জরিপ প্রত্যয়নপত্র',
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                'তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())} | পয়েন্ট: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি (WGS84)',
-                style: const pw.TextStyle(fontSize: 11),
-              ),
-              pw.Divider(thickness: 1.5),
-              pw.SizedBox(height: 10),
-              pw.Text('মোট জমি: ${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(katha, fractionDigits: 2)} কাঠা | ${BanglaFormatter.formatNumber(bigha, fractionDigits: 3)} বিঘা)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              pw.Text('বর্গফুট: ${BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 2)} sq ft | পরিসীমা: ${BanglaFormatter.formatNumber(_perimeterFt, fractionDigits: 1)} ফুট', style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 12),
-              pw.Text('জরিপকৃত সীমানা ওয়েপয়েন্ট (WGS84):', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 6),
-              pw.TableHelper.fromTextArray(
-                headers: ['#', 'অক্ষাংশ (Latitude)', 'দ্রাঘিমাংশ (Longitude)'],
-                data: _surveyPoints.asMap().entries.map((e) => [
-                  'পিন ${BanglaNumerals.toBangla(e.key + 1)}',
-                  e.value.latitude.toStringAsFixed(6),
-                  e.value.longitude.toStringAsFixed(6),
-                ]).toList(),
-              ),
-              pw.Spacer(),
-              pw.Divider(),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('ইঞ্জিন: ESRI / Mapbox GeoDesic WGS84'),
-                  pw.Text('সার্ভেয়ারের স্বাক্ষর: _______________'),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
+    final rows = _surveyPoints.asMap().entries.map((e) {
+      return '<tr><td>পিন ${esc(BanglaNumerals.toBangla(e.key + 1))}</td><td>${e.value.latitude.toStringAsFixed(6)}°</td><td>${e.value.longitude.toStringAsFixed(6)}°</td></tr>';
+    }).join();
+
+    final bodyHtml = '''
+      <div class="kpi-grid">
+        <div class="kpi-box"><div class="kpi-label">শতক (Decimal)</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(decimal, fractionDigits: 3))} শতক</div></div>
+        <div class="kpi-box"><div class="kpi-label">কাঠা (Katha)</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(katha, fractionDigits: 2))} কাঠা</div></div>
+        <div class="kpi-box"><div class="kpi-label">বিঘা / বর্গফুট</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(bigha, fractionDigits: 3))} বিঘা</div></div>
+      </div>
+      <div class="info-panel">
+        <strong>মোট ক্ষেত্রফল:</strong> ${esc(BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 2))} বর্গফুট •
+        <strong>মোট পরিসীমা:</strong> ${esc(BanglaFormatter.formatNumber(_perimeterFt, fractionDigits: 1))} ফুট •
+        <strong>পয়েন্ট সংখ্যা:</strong> ${esc(BanglaNumerals.toBangla(_surveyPoints.length))} টি (WGS84)
+      </div>
+      <h3 class="section-title">জরিপকৃত সীমানা ওয়েপয়েন্ট তালিকা (WGS84)</h3>
+      <table>
+        <tr><th>ক্রমিক পিন</th><th>অক্ষাংশ (Latitude)</th><th>দ্রাঘিমাংশ (Longitude)</th></tr>
+        $rows
+      </table>
+    ''';
+
+    final html = PdfReportHelper.buildCadastralHtmlDocument(
+      title: 'BDLandPro স্যাটেলাইট ও GPS ভূমি জরিপ প্রত্যয়নপত্র',
+      subtitle: 'তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())} • ESRI / Mapbox GeoDesic WGS84',
+      badgeText: '${BanglaFormatter.formatNumber(decimal, fractionDigits: 2)} শতক',
+      bodyHtml: bodyHtml,
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'BDLandPro_GPS_Survey_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    await PdfReportHelper.printHtmlPdf(
+      html: html,
+      jobName: 'BDLandPro_GPS_Survey_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
   }
 

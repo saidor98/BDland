@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
@@ -25,9 +22,6 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
   final _notesCtrl = TextEditingController(text: 'হেরন্স ফর্মুলায় সরেজমিনে সীমানা পরিমাপপূর্বক দখল বুঝিয়ে দেওয়া হইল।');
 
   Future<void> _generateAndPrintPdf() async {
-    final theme = await PdfReportHelper.loadBengaliTheme();
-    final pdf = pw.Document(theme: theme);
-
     final client = _clientNameCtrl.text;
     final surveyor = _surveyorNameCtrl.text;
     final phone = _surveyorPhoneCtrl.text;
@@ -36,6 +30,8 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
     final dec = double.tryParse(_areaDecimalCtrl.text) ?? 0.0;
     final sqFt = dec * 435.60;
     final katha = sqFt / 720.00;
+    final bigha = dec / 33.0;
+    final acre = dec / 100.0;
     final notes = _notesCtrl.text;
 
     await HistoryService.instance.saveItem(
@@ -50,141 +46,61 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
       ),
     );
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Container(
-                alignment: pw.Alignment.center,
-                padding: const pw.EdgeInsets.only(bottom: 12),
-                decoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(width: 2, color: PdfColors.green800)),
-                ),
-                child: pw.Column(
-                  children: [
-                    pw.Text('বিডি ল্যান্ড প্রো — ভূমি পরিমাপ ও জরিপ প্রতিবেদন',
-                        style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
-                    pw.SizedBox(height: 4),
-                    pw.Text('সরকারি ক্যাডাস্ট্রাল মানদণ্ড অনুযায়ী জমি ও সীমানা প্রত্যয়নপত্র',
-                        style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 20),
+    final esc = PdfReportHelper.escapeHtml;
+    final bodyHtml = '''
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-label">শতাংশ / শতক</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatNumber(dec, fractionDigits: 3))} শতক</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">কাঠা (সরকারি মান)</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatNumber(katha, fractionDigits: 3))} কাঠা</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">বর্গফুট (Sq. Ft)</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatNumber(sqFt, fractionDigits: 1))} ft²</div>
+        </div>
+      </div>
 
-              // Surveyor and Client Details Table
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('গ্রাহকের নাম:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(client)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('তারিখ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(DateTime.now().toString().split(' ')[0])),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('মৌজা ও দাগ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$mouza, দাগ #$dag')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('সার্ভেয়ার:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$surveyor ($phone)')),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
+      <h3 class="section-title">গ্রাহক ও জরিপকারীর পরিচিতি</h3>
+      <table>
+        <tr>
+          <th style="width:22%">জমির মালিক</th><td>${esc(client)}</td>
+          <th style="width:20%">তারিখ</th><td>${esc(BanglaFormatter.formatDateTime(DateTime.now()))}</td>
+        </tr>
+        <tr>
+          <th>মৌজা ও দাগ নং</th><td>${esc(mouza)}, দাগ #${esc(dag)}</td>
+          <th>সার্ভেয়ার (আমিন)</th><td>${esc(surveyor)} (${esc(phone)})</td>
+        </tr>
+      </table>
 
-              // Measurement Table
-              pw.Text('জমির ক্ষেত্রফল সারসংক্ষেপ (প্রত্যয়িত পরিমাপ):', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 8),
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.green50),
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('জমির একক', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('পরিমাপকৃত পরিমাণ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('সরকারি হিসাব মান', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('শতাংশ / শতক')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${dec.toStringAsFixed(3)} শতক', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('১ শতক = ৪৩৫.৬০ বর্গফুট')),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('কাঠা (সরকারি মান)')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${katha.toStringAsFixed(3)} কাঠা')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('১ কাঠা = ৭২০ বর্গফুট')),
-                    ],
-                  ),
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('বর্গফুট (Sq. Ft)')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${sqFt.toStringAsFixed(1)} বর্গফুট')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('সরাসরি ক্যাডাস্ট্রাল ক্ষেত্রফল')),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
+      <h3 class="section-title">জমির ক্ষেত্রফল সারসংক্ষেপ (প্রত্যয়িত পরিমাপ)</h3>
+      <table>
+        <tr><th>জমির একক</th><th>পরিমাপকৃত পরিমাণ</th><th>সরকারি হিসাব মানদণ্ড</th></tr>
+        <tr><td><strong>শতাংশ / শতক</strong></td><td><strong>${esc(BanglaFormatter.formatNumber(dec, fractionDigits: 3))} শতক</strong></td><td>১ শতক = ৪৩৫.৬০ বর্গফুট</td></tr>
+        <tr><td>কাঠা (সরকারি মান)</td><td>${esc(BanglaFormatter.formatNumber(katha, fractionDigits: 3))} কাঠা</td><td>১ কাঠা = ৭২০ বর্গফুট</td></tr>
+        <tr><td>বিঘা ও একর</td><td>${esc(BanglaFormatter.formatNumber(bigha, fractionDigits: 3))} বিঘা / ${esc(BanglaFormatter.formatNumber(acre, fractionDigits: 4))} একর</td><td>১ একর = ১০০ শতক (৩.০৩ বিঘা)</td></tr>
+        <tr><td>বর্গফুট (Sq. Ft)</td><td>${esc(BanglaFormatter.formatNumber(sqFt, fractionDigits: 1))} বর্গফুট</td><td>সরাসরি ক্যাডাস্ট্রাল ক্ষেত্রফল</td></tr>
+      </table>
 
-              // Surveyor Comments
-              pw.Text('সার্ভেয়ারের মাঠ পর্যায়ের নোট ও চৌহদ্দি:', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  border: pw.TableBorder.all(color: PdfColors.grey300),
-                  color: PdfColors.grey50,
-                ),
-                child: pw.Text(notes, style: const pw.TextStyle(fontSize: 11)),
-              ),
+      <h3 class="section-title">সার্ভেয়ারের মাঠ পর্যায়ের নোট ও সীমানা মন্তব্য</h3>
+      <div class="info-panel">${esc(notes)}</div>
+    ''';
 
-              pw.Spacer(),
-
-              // Signatures
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Container(width: 140, height: 1, color: PdfColors.grey700),
-                      pw.SizedBox(height: 4),
-                      pw.Text('জমির মালিক / গ্রাহকের স্বাক্ষর', style: const pw.TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Container(width: 140, height: 1, color: PdfColors.grey700),
-                      pw.SizedBox(height: 4),
-                      pw.Text('সার্ভেয়ার / আমিনের স্বাক্ষর ও সিল', style: const pw.TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
+    final html = PdfReportHelper.buildCadastralHtmlDocument(
+      title: 'বিডি ল্যান্ড প্রো — ভূমি পরিমাপ ও জরিপ প্রতিবেদন',
+      subtitle: 'সরকারি ক্যাডাস্ট্রাল মানদণ্ড অনুযায়ী জমি ও সীমানা প্রত্যয়নপত্র',
+      badgeText: 'দাগ #$dag',
+      bodyHtml: bodyHtml,
+      leftSignatureLabel: 'জমির মালিক / গ্রাহকের স্বাক্ষর',
+      rightSignatureLabel: 'সার্ভেয়ার / আমিনের স্বাক্ষর ও সিল',
     );
 
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+    await PdfReportHelper.printHtmlPdf(
+      html: html,
+      jobName: 'BDLandPro_Certificate_${mouza}_$dag.pdf',
+    );
   }
 
   @override

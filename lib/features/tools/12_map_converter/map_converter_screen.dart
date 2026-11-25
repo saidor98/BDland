@@ -131,18 +131,17 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
         return;
       }
 
-      // PNG or PDF -> Capture live filtered canvas bytes
+      // PNG or PDF -> Capture live filtered canvas bytes with bounded safe pixelRatio
       Uint8List? pngBytes;
       final boundary = _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary != null) {
-        final pixelRatio = (_dpi / 150.0).clamp(1.0, 4.0);
+        final pixelRatio = (_dpi / 150.0).clamp(1.0, 2.5);
         final img = await boundary.toImage(pixelRatio: pixelRatio);
         final bd = await img.toByteData(format: ui.ImageByteFormat.png);
         pngBytes = bd?.buffer.asUint8List();
       }
 
       if (_targetFormat == 'PNG' && pngBytes != null) {
-        // Wrap high-res PNG bytes in an exact-aspect clean PDF page so OS Print/Share handles it reliably
         final imgPdf = pw.Document();
         imgPdf.addPage(
           pw.Page(
@@ -157,36 +156,26 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
         return;
       }
 
-      final theme = await PdfReportHelper.loadBengaliTheme();
-      final pdf = pw.Document(theme: theme);
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
-          build: (pw.Context ctx) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('BDLandPro ক্যালিব্রেটেড ও ক্লিনকৃত মৌজা শিট', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 6),
-                pw.Text('স্কেল: $_scale | রেজোলিউশন: $_dpi DPI | ১ পিক্সেল = ${_feetPerPixel.toStringAsFixed(3)} ফুট (${_linksPerPixel.toStringAsFixed(3)} লিংক)', style: const pw.TextStyle(fontSize: 10)),
-                pw.SizedBox(height: 12),
-                if (pngBytes != null)
-                  pw.Expanded(
-                    child: pw.Center(
-                      child: pw.Image(pw.MemoryImage(pngBytes), fit: pw.BoxFit.contain),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
+      await _saveExportHistory('PDF ($_scale, $_dpi DPI)', 'PDF তৈরি (${BanglaFormatter.formatDateTime(DateTime.now())})');
+      final esc = PdfReportHelper.escapeHtml;
+      final imgTag = pngBytes != null
+          ? '<div class="image-box"><img src="${PdfReportHelper.pngBytesToDataUri(pngBytes)}" /></div>'
+          : '';
+      final html = PdfReportHelper.buildCadastralHtmlDocument(
+        title: 'ক্যালিব্রেটেড ও পরিশোধিত মৌজা নকশা শিট',
+        subtitle: 'স্কেল: $_scale • $_dpi DPI • তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}',
+        badgeText: '$_dpi DPI',
+        bodyHtml: '''
+          <div class="info-panel">
+            <strong>স্কেল ক্যালিব্রেশন:</strong> ১ পিক্সেল = ${esc(_feetPerPixel.toStringAsFixed(3))} ফুট (${esc(_linksPerPixel.toStringAsFixed(3))} লিংক) • ডেসকিউ: ${esc(_deskewAngle.toStringAsFixed(1))}°
+          </div>
+          $imgTag
+        ''',
       );
 
-      await _saveExportHistory('PDF ($_scale, $_dpi DPI)', 'PDF তৈরি (${BanglaFormatter.formatDateTime(DateTime.now())})');
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'BDLandPro_Mouza_Converted.pdf',
+      await PdfReportHelper.printHtmlPdf(
+        html: html,
+        jobName: 'BDLandPro_Mouza_Converted.pdf',
       );
     } catch (e) {
       if (mounted) {

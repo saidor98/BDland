@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bdland_pro/core/utils/pdf_report_helper.dart';
 import 'package:bdland_pro/features/tools/02_mouza_simple/mouza_map_simple_screen.dart';
 import 'package:bdland_pro/features/tools/04_anyshape_divider/anyshape_divider_screen.dart';
 import 'package:bdland_pro/features/tools/05_quadmaster/quadmaster_screen.dart';
@@ -253,6 +254,19 @@ void main() {
 
       expect(find.textContaining('নামজারি (Mutation)'), findsOneWidget);
       expect(find.textContaining('গান্টার্স চেইন'), findsNothing);
+    });
+
+    test('PdfReportHelper builds stylized Emerald & Gold A4 Bengali HTML safely', () {
+      final html = PdfReportHelper.buildCadastralHtmlDocument(
+        title: 'সম্পত্তির তফসিল বিবরণী',
+        subtitle: 'মৌজা: <জাফরাবাদ> & দাগ ৫০১',
+        bodyHtml: '<p>হস্তান্তরিত জমি: ৫.০০ শতক</p>',
+      );
+      expect(html, contains('#004126'));
+      expect(html, contains('#FFC64D'));
+      expect(html, contains('সম্পত্তির তফসিল বিবরণী'));
+      expect(html, contains('&lt;জাফরাবাদ&gt; &amp; দাগ ৫০১'));
+      expect(html, contains('হস্তান্তরিত জমি: ৫.০০ শতক'));
     });
   });
 }

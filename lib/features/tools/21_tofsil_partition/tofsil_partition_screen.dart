@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/history_service.dart';
@@ -79,9 +76,12 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
   }
 
   Future<void> _printTofsilPdf() async {
-    final theme = await PdfReportHelper.loadBengaliTheme();
-    final pdf = pw.Document(theme: theme);
     final text = _generateFormalTofsilText();
+    final total = double.tryParse(_totalLandCtrl.text) ?? 0.0;
+    final part = double.tryParse(_partitionLandCtrl.text) ?? 0.0;
+    final sqFt = part * 435.60;
+    final namjariShare1000 = total > 0 ? ((part / total) * 1000).round() : 0;
+    final fractionShare = total > 0 ? (part / total).toStringAsFixed(4) : '0.0000';
 
     await HistoryService.instance.saveItem(
       CalculationHistoryItem(
@@ -95,43 +95,72 @@ class _TofsilPartitionScreenState extends State<TofsilPartitionScreen> {
       ),
     );
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Center(
-                  child: pw.Text(
-                    'সম্পত্তির তফসিল বিবরণী (Deed Schedule)',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-                  ),
-                ),
-                pw.Divider(thickness: 1.5),
-                pw.SizedBox(height: 12),
-                pw.Text(text, style: const pw.TextStyle(fontSize: 11, lineSpacing: 2)),
-                pw.Spacer(),
-                pw.Divider(),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('দখলকার / দলিলগ্রহীতার স্বাক্ষর: _______________'),
-                    pw.Text('সার্ভেয়ার / আমিনের স্বাক্ষর: _______________'),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    final esc = PdfReportHelper.escapeHtml;
+    final bodyHtml = '''
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-label">বণ্টনকৃত জমির পরিমাণ</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatNumber(part, fractionDigits: 2))} শতক</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">সমপরিমাণ বর্গফুট</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatNumber(sqFt, fractionDigits: 1))} বর্গফুট</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">নামজারি হিস্যা (১০০০ স্কেল)</div>
+          <div class="kpi-val">${esc(BanglaNumerals.toBangla(namjariShare1000))} / ১০০০ ($fractionShare)</div>
+        </div>
+      </div>
+
+      <h3 class="section-title">১. মৌজা, সাব-রেজিস্ট্রি ও খতিয়ান পরিচিতি</h3>
+      <table>
+        <tr>
+          <th>জেলা</th><td>${esc(_districtCtrl.text)}</td>
+          <th>থানা / উপজেলা</th><td>${esc(_upazilaCtrl.text)}</td>
+        </tr>
+        <tr>
+          <th>সাব-রেজিস্ট্রি অফিস</th><td colspan="3">${esc(_subRegistryCtrl.text)}</td>
+        </tr>
+        <tr>
+          <th>মৌজার নাম</th><td>${esc(_mouzaCtrl.text)}</td>
+          <th>জে.এল. নং</th><td>${esc(_jlCtrl.text)}</td>
+        </tr>
+        <tr>
+          <th>খতিয়ান নং</th><td>${esc(_khatianCtrl.text)}</td>
+          <th>দাগ নং</th><td>${esc(_dagCtrl.text)} (শ্রেণি: নাল / বাস্তু)</td>
+        </tr>
+        <tr>
+          <th>দাগে মোট জমি</th><td>${esc(BanglaFormatter.formatNumber(total, fractionDigits: 2))} শতক</td>
+          <th>হস্তান্তরিত অংশ</th><td><strong>${esc(BanglaFormatter.formatNumber(part, fractionDigits: 2))} শতক</strong></td>
+        </tr>
+      </table>
+
+      <h3 class="section-title">২. হস্তান্তরকৃত জমির চতুর্সীমা / চৌহদ্দি</h3>
+      <table>
+        <tr><th style="width:24%">দিক</th><th>সীমানার বিবরণ</th></tr>
+        <tr><td><strong>উত্তরে (North)</strong></td><td>${esc(_northCtrl.text)}</td></tr>
+        <tr><td><strong>দক্ষিণে (South)</strong></td><td>${esc(_southCtrl.text)}</td></tr>
+        <tr><td><strong>পূর্বে (East)</strong></td><td>${esc(_eastCtrl.text)}</td></tr>
+        <tr><td><strong>পশ্চিমে (West)</strong></td><td>${esc(_westCtrl.text)}</td></tr>
+      </table>
+
+      <div class="info-panel">
+        <strong>আনুষ্ঠানিক বর্ণনা:</strong> অদ্য বাটোয়ারা/বণ্টন দলিলের বর্ণনা মতে উপরোক্ত দাগের মধ্য হইতে অত্র দলিলগ্রহীতার অংশে নালিশী মোট <strong>${esc(BanglaFormatter.formatNumber(part, fractionDigits: 2))} শতক</strong> [প্রায় ${esc(BanglaFormatter.formatNumber(sqFt, fractionDigits: 1))} বর্গফুট] জমি উহার যাবতীয় স্বত্ব-স্বার্থ, এওয়াজ ও দখলসহ হস্তান্তরিত ও বণ্টিত হইল।
+      </div>
+    ''';
+
+    final html = PdfReportHelper.buildCadastralHtmlDocument(
+      title: 'সম্পত্তির তফসিল বিবরণী (Deed Schedule)',
+      subtitle: 'তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())} • সাব-রেজিস্ট্রি ফরম্যাট',
+      badgeText: 'দাগ নং: ${_dagCtrl.text}',
+      bodyHtml: bodyHtml,
+      leftSignatureLabel: 'দখলকার / দলিলগ্রহীতার স্বাক্ষর',
+      rightSignatureLabel: 'সার্ভেয়ার / আমিনের স্বাক্ষর ও সিল',
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'Tofsil_${_mouzaCtrl.text}_Dag_${_dagCtrl.text}.pdf',
+    await PdfReportHelper.printHtmlPdf(
+      html: html,
+      jobName: 'Tofsil_${_mouzaCtrl.text}_Dag_${_dagCtrl.text}.pdf',
     );
   }
 

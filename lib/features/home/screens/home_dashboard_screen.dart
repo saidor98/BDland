@@ -164,20 +164,39 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           appBar: isDesktop
               ? null
               : AppBar(
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
                   surfaceTintColor: Colors.transparent,
-                  elevation: 0.5,
-                  title: const Text(
-                    'বিডি ল্যান্ড প্রো',
-                    style: TextStyle(
-                      color: AppColors.primaryGreen,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+                  elevation: 0,
+                  title: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assets/images/app_icon.png',
+                          width: 30,
+                          height: 30,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.explore, color: AppColors.accentGold, size: 24),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Flexible(
+                        child: Text(
+                          'বিডি ল্যান্ড প্রো',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   actions: [
                     IconButton(
-                      icon: const Icon(Icons.history, color: AppColors.primaryGreen),
+                      icon: const Icon(Icons.history, color: AppColors.secondaryGoldLight),
                       tooltip: 'পরিমাপের হিস্ট্রি',
                       onPressed: () {
                         Navigator.push(

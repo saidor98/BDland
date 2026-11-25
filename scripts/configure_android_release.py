@@ -34,6 +34,8 @@ def main():
         )
         if "<uses-permission" not in content:
             content = content.replace("<application", permissions + "    <application", 1)
+        if 'android:largeHeap=' not in content:
+            content = content.replace("<application", '<application\n        android:largeHeap="true"', 1)
         content = re.sub(r'android:label="[^"]*"', 'android:label="বিডি ল্যান্ড প্রো (BDLandPro)"', content)
         with open(manifest_path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -155,6 +157,40 @@ def main():
             with open(root_groovy, 'w', encoding='utf-8') as f:
                 f.write(rg_content)
             print("Patched android/build.gradle to enforce compileSdk >= 36 on library subprojects.")
+
+    # 6. Install BDLandPro Launcher Icons & Adaptive Icon (replacing default Flutter logo)
+    import shutil
+    res_dir = os.path.join("android", "app", "src", "main", "res")
+    icon_src_root = os.path.join("assets", "icons")
+    if os.path.exists(res_dir) and os.path.exists(icon_src_root):
+        for density in ["mipmap-mdpi", "mipmap-hdpi", "mipmap-xhdpi", "mipmap-xxhdpi", "mipmap-xxxhdpi"]:
+            src_d = os.path.join(icon_src_root, density)
+            dst_d = os.path.join(res_dir, density)
+            if os.path.exists(src_d):
+                os.makedirs(dst_d, exist_ok=True)
+                for fname in os.listdir(src_d):
+                    shutil.copy2(os.path.join(src_d, fname), os.path.join(dst_d, fname))
+
+        anydpi_dir = os.path.join(res_dir, "mipmap-anydpi-v26")
+        values_dir = os.path.join(res_dir, "values")
+        os.makedirs(anydpi_dir, exist_ok=True)
+        os.makedirs(values_dir, exist_ok=True)
+
+        bg_xml = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#004126</color>\n</resources>\n'
+        with open(os.path.join(values_dir, "ic_launcher_background.xml"), "w", encoding="utf-8") as f:
+            f.write(bg_xml)
+
+        adaptive_xml = (
+            '<?xml version="1.0" encoding="utf-8"?>\n'
+            '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+            '    <background android:drawable="@color/ic_launcher_background"/>\n'
+            '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+            '</adaptive-icon>\n'
+        )
+        for icon_xml in ["ic_launcher.xml", "ic_launcher_round.xml"]:
+            with open(os.path.join(anydpi_dir, icon_xml), "w", encoding="utf-8") as f:
+                f.write(adaptive_xml)
+        print("Installed BDLandPro custom launcher & adaptive icons cleanly.")
 
 if __name__ == "__main__":
     main()

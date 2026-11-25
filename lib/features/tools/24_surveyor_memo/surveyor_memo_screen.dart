@@ -1,9 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
@@ -198,27 +195,55 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
   }
 
   Future<void> _printMemoPdf() async {
-    final theme = await PdfReportHelper.loadBengaliTheme();
-    final pdf = pw.Document(theme: theme);
-    final memoText = _generateMemoText();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        build: (pw.Context ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text('BDLandPro - সার্ভেয়ার মেমো ও ক্যাশ রসিদ', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
-              pw.Divider(),
-              pw.SizedBox(height: 12),
-              pw.Text(memoText, style: const pw.TextStyle(fontSize: 12, lineSpacing: 3)),
-            ],
-          );
-        },
-      ),
+    final total = double.tryParse(_totalFeeCtrl.text) ?? 0;
+    final advance = double.tryParse(_advanceCtrl.text) ?? 0;
+    final due = total - advance;
+    final memoNo = 'MEMO-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final esc = PdfReportHelper.escapeHtml;
+
+    final bodyHtml = '''
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-label">মোট নির্ধারিত ফি</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatCurrency(total))}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">অগ্রিম পরিশোধিত</div>
+          <div class="kpi-val">${esc(BanglaFormatter.formatCurrency(advance))}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">অবশিষ্ট বকেয়া</div>
+          <div class="kpi-val" style="color:${due <= 0 ? '#004126' : '#BA1A1A'}">${esc(BanglaFormatter.formatCurrency(due))}</div>
+        </div>
+      </div>
+
+      <h3 class="section-title">গ্রাহক ও জরিপ কাজের বিবরণ</h3>
+      <table>
+        <tr><th style="width:24%">রসিদ নং</th><td><strong>$memoNo</strong></td><th style="width:20%">তারিখ</th><td>${esc(BanglaFormatter.formatDateTime(DateTime.now()))}</td></tr>
+        <tr><th>গ্রাহকের নাম</th><td>${esc(_clientCtrl.text)}</td><th>মোবাইল নং</th><td>${esc(_phoneCtrl.text)}</td></tr>
+        <tr><th>মৌজা ও দাগ নং</th><td>${esc(_mouzaCtrl.text)} (দাগ: ${esc(_dagCtrl.text)})</td><th>স্ট্যাটাস</th><td>${due <= 0 ? '<span class="status-paid">পরিশোধিত (PAID)</span>' : '<span class="status-due">বকেয়া বিদ্যমান</span>'}</td></tr>
+        <tr><th>কাজের বিবরণ</th><td colspan="3">${esc(_serviceType)}</td></tr>
+      </table>
+
+      <h3 class="section-title">আর্থিক হিসাব ও ক্যাশ রসিদ সারসংক্ষেপ</h3>
+      <table>
+        <tr><th>বিবরণ</th><th style="width:30%">টাকার পরিমাণ</th></tr>
+        <tr><td>সার্ভেয়ার / আমিন জরিপ ও নকশা ফি</td><td><strong>${esc(BanglaFormatter.formatCurrency(total))}</strong></td></tr>
+        <tr><td>জমা / অগ্রিম প্রদান</td><td>${esc(BanglaFormatter.formatCurrency(advance))}</td></tr>
+        <tr><td><strong>অবশিষ্ট নিট বকেয়া</strong></td><td><strong>${esc(BanglaFormatter.formatCurrency(due))}</strong></td></tr>
+      </table>
+    ''';
+
+    final html = PdfReportHelper.buildCadastralHtmlDocument(
+      title: 'সার্ভেয়ার মেমো ও ক্যাশ রসিদ (INVOICE)',
+      subtitle: 'রসিদ নং: $memoNo • BDLandPro ডিজিটাল সার্ভে লেজার',
+      badgeText: due <= 0 ? 'পরিশোধিত' : 'বকেয়া মেমো',
+      bodyHtml: bodyHtml,
+      leftSignatureLabel: 'গ্রাহকের স্বাক্ষর',
+      rightSignatureLabel: 'আমিন / সার্ভেয়ারের স্বাক্ষর ও সিল',
     );
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save(), name: 'BDLandPro_Surveyor_Memo.pdf');
+
+    await PdfReportHelper.printHtmlPdf(html: html, jobName: 'BDLandPro_Surveyor_Memo_$memoNo.pdf');
   }
 
   Future<void> _saveMemo() async {

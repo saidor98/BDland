@@ -2,9 +2,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
@@ -128,6 +125,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           child: MouzaSheetImage(
             source: src,
             fit: BoxFit.contain,
+            maxDecodeWidth: _isHighQuality ? 2048 : 1100,
             errorFallback: _buildSheetErrorState(),
           ),
         ),
@@ -1377,63 +1375,46 @@ $coords
     );
   }
 
-  // Export PDF Certificate
+  // Export PDF Certificate (Native Bengali Html2Pdf formatting)
   void _exportPdf() async {
-    final bengaliTheme = await PdfReportHelper.loadBengaliTheme();
-    final pdf = pw.Document(theme: bengaliTheme);
     final dec = _totalAreaSqFt / 435.60;
     final katha = _totalAreaSqFt / 720.00;
+    final acre = _totalAreaSqFt / 43560.0;
+    final esc = PdfReportHelper.escapeHtml;
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Center(
-                  child: pw.Text('মৌজা ম্যাপ ক্যাডাস্ট্রাল পরিমাপ ও জরিপ প্রত্যয়নপত্র', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Center(
-                  child: pw.Text('$_activeMouza | $_activeSheet | স্কেল: $_selectedScale', style: const pw.TextStyle(fontSize: 11)),
-                ),
-                pw.Divider(thickness: 1.5),
-                pw.SizedBox(height: 12),
-                pw.Text('মোট ক্ষেত্রফল: ${BanglaFormatter.formatNumber(_totalAreaSqFt)} বর্গফুট', style: const pw.TextStyle(fontSize: 13)),
-                pw.Text('মোট পরিমাণ: ${BanglaFormatter.formatNumber(dec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(katha, fractionDigits: 2)} কাঠা)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-                pw.Text('মোট পরিসীমা: ${BanglaFormatter.formatNumber(_totalPerimeterFt)} ফুট', style: const pw.TextStyle(fontSize: 13)),
-                if (_showDivisionCutLine) ...[
-                  pw.SizedBox(height: 8),
-                  pw.Text('অটো-ডিভিশন কর্তন: ${BanglaFormatter.formatNumber(_targetCutDecimals, fractionDigits: 2)} শতক ($_cutOffsetSummary)', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.orange900)),
-                ],
-                pw.SizedBox(height: 16),
-                pw.Container(
-                  height: 180,
-                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400)),
-                  child: pw.Center(child: pw.Text('দাগের ক্যাডাস্ট্রাল ভেক্টর সীমানা নকশা', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700))),
-                ),
-                pw.Spacer(),
-                pw.Divider(),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}'),
-                    pw.Text('সার্ভেয়ারের স্বাক্ষর ও সিল: ____________________'),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    final cutHtml = _showDivisionCutLine
+        ? '<div class="info-panel"><strong>অটো-ডিভিশন কর্তন:</strong> ${esc(BanglaFormatter.formatNumber(_targetCutDecimals, fractionDigits: 2))} শতক (${esc(_cutOffsetSummary)})</div>'
+        : '';
+
+    final bodyHtml = '''
+      <div class="kpi-grid">
+        <div class="kpi-box"><div class="kpi-label">শতক (Decimal)</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(dec, fractionDigits: 3))} শতক</div></div>
+        <div class="kpi-box"><div class="kpi-label">কাঠা (Katha)</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(katha, fractionDigits: 2))} কাঠা</div></div>
+        <div class="kpi-box"><div class="kpi-label">বর্গফুট (Sq. Ft)</div><div class="kpi-val">${esc(BanglaFormatter.formatNumber(_totalAreaSqFt, fractionDigits: 1))} ft²</div></div>
+      </div>
+      <table>
+        <tr><th style="width:24%">মৌজা</th><td>${esc(_activeMouza)}</td><th style="width:20%">নকশা শিট</th><td>${esc(_activeSheet)}</td></tr>
+        <tr><th>স্কেল মানদণ্ড</th><td>${esc(_selectedScale)}</td><th>তারিখ</th><td>${esc(BanglaFormatter.formatDateTime(DateTime.now()))}</td></tr>
+        <tr><th>মোট পরিসীমা</th><td>${esc(BanglaFormatter.formatNumber(_totalPerimeterFt, fractionDigits: 1))} ফুট</td><th>একর</th><td>${esc(BanglaFormatter.formatNumber(acre, fractionDigits: 4))} একর</td></tr>
+      </table>
+      $cutHtml
+      <h3 class="section-title">দাগের শীর্ষবিন্দু ও বাহু পরিমাপ</h3>
+      <table>
+        <tr><th>কোণ নং</th><th>CAD X (ফুট)</th><th>CAD Y (ফুট)</th></tr>
+        ${_measuredPoints.asMap().entries.map((e) => '<tr><td>বিন্দু ${esc(BanglaNumerals.toBangla(e.key + 1))}</td><td>${(e.value.dx * _feetPerPixel).toStringAsFixed(1)}</td><td>${(e.value.dy * _feetPerPixel).toStringAsFixed(1)}</td></tr>').join()}
+      </table>
+    ''';
+
+    final html = PdfReportHelper.buildCadastralHtmlDocument(
+      title: 'মৌজা ম্যাপ ক্যাডাস্ট্রাল পরিমাপ ও জরিপ প্রত্যয়নপত্র',
+      subtitle: '$_activeMouza • $_activeSheet • $_selectedScale',
+      badgeText: '${BanglaFormatter.formatNumber(dec, fractionDigits: 2)} শতক',
+      bodyHtml: bodyHtml,
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'Mouza_Survey_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    await PdfReportHelper.printHtmlPdf(
+      html: html,
+      jobName: 'Mouza_Survey_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
   }
 
