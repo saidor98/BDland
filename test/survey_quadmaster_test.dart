@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bdland_pro/features/tools/04_anyshape_divider/anyshape_divider_screen.dart';
 import 'package:bdland_pro/features/tools/05_quadmaster/quadmaster_screen.dart';
 import 'package:bdland_pro/features/tools/19_hindu_inheritance/hindu_inheritance_screen.dart';
+import 'package:bdland_pro/features/tools/20_hissya_calculator/hissya_calculator_screen.dart';
 import 'package:bdland_pro/features/tools/widgets/touch_magnifier_loupe.dart';
 
 void main() {
@@ -162,6 +164,34 @@ void main() {
       expect(isValidWGS84(23.8, double.nan), isFalse);
       expect(isValidWGS84(double.infinity, 90.0), isFalse);
       expect(isValidWGS84(23.8, double.negativeInfinity), isFalse);
+    });
+  });
+
+  group('HissyaCalculatorScreen & AnyShapeDividerScreen Tests', () {
+    testWidgets('HissyaCalculator supports multiply and divide share operations', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: HissyaCalculatorScreen()));
+      await tester.pumpAndSettle();
+
+      // Default Share 1 = 4 Ana 10 Gonda. Switch to Multiply (x2) -> 9 Ana
+      await tester.tap(find.text('× গুণ'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('৯ আনা'), findsOneWidget);
+
+      // Switch to Divide (/2) -> 2 Ana 5 Gonda
+      await tester.tap(find.text('÷ ভাগ'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('২ আনা ৫ গণ্ডা'), findsOneWidget);
+    });
+
+    testWidgets('AnyShapeDivider allows adding a new polygon corner vertex', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AnyShapeDividerScreen()));
+      await tester.pumpAndSettle();
+
+      final addVertexBtn = find.text('+ কোণ যোগ');
+      expect(addVertexBtn, findsOneWidget);
+      await tester.ensureVisible(addVertexBtn);
+      await tester.tap(addVertexBtn);
+      await tester.pumpAndSettle();
     });
   });
 }

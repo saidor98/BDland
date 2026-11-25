@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/polygon_geometry.dart';
 import '../../history/models/calculation_history_item.dart';
+import '../widgets/mouza_sheet_image.dart';
 import '../widgets/touch_magnifier_loupe.dart';
 
 class MouzaMapAdvanceCadScreen extends StatefulWidget {
@@ -42,6 +44,100 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
   int? _selectedVertexIndex;
   Offset? _touchPosition;
   bool _isTouchActive = false;
+
+  // Background Mouza Sheet & Interactive Zoom/Pan
+  final TransformationController _transformationController = TransformationController();
+  bool _isZoomPanMode = false;
+  double _canvasZoom = 1.0;
+  String? _sheetSource;
+  bool _showSheet = true;
+  double _sheetOpacity = 0.80;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _setCanvasZoom(double nextScale, Size viewportSize) {
+    final clamped = nextScale.clamp(0.8, 8.0);
+    final center = Offset(viewportSize.width / 2.0, viewportSize.height / 2.0);
+    final sceneCenter = _transformationController.toScene(center);
+    _transformationController.value = Matrix4.identity()
+      ..translate(center.dx, center.dy)
+      ..scale(clamped)
+      ..translate(-sceneCenter.dx, -sceneCenter.dy);
+    setState(() => _canvasZoom = clamped);
+  }
+
+  Future<void> _pickCadMouzaSheet() async {
+    final picked = await DeviceFileService.instance.pickMouzaSheet();
+    if (!mounted || picked == null) return;
+    setState(() {
+      _sheetSource = picked.path;
+      _showSheet = true;
+      _transformationController.value = Matrix4.identity();
+      _canvasZoom = 1.0;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('মৌজা শিট লোড হয়েছে: ${picked.name}'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
+  void _showSheetSourceMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('CAD ব্যাকগ্রাউন্ড মৌজা নকশা', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            ListTile(
+              leading: const Icon(Icons.folder_open, color: AppColors.primaryGreen),
+              title: const Text('ফোন থেকে ফাইল / ছবি / PDF নিন'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickCadMouzaSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.map, color: Color(0xFF0284C7)),
+              title: const Text('নমুনা শিট ১ (তেজকুনিপাড়া SA)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _sheetSource = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
+                  _showSheet = true;
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.map, color: Color(0xFF0284C7)),
+              title: const Text('নমুনা শিট ২ (কাওরান বাজার SA)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _sheetSource = 'assets/mouza_maps/sample_mouza_sheet_2.jpg';
+                  _showSheet = true;
+                });
+              },
+            ),
+            if (_sheetSource != null)
+              ListTile(
+                leading: const Icon(Icons.layers_clear, color: AppColors.accentCrimson),
+                title: const Text('নকশা সরিয়ে শুধু CAD গ্রিড দেখুন'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _sheetSource = null);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _pushUndo() {
     _undoStack.add(List<Offset>.from(_vertices));
@@ -100,6 +196,7 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
         showAngles: _showAngles,
         splitStart: _splitStart,
         splitEnd: _splitEnd,
+        transparentBg: _sheetSource != null && _showSheet,
       ),
       size: Size.infinite,
     );
@@ -108,6 +205,16 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
       appBar: AppBar(
         title: const Text('মৌজা ম্যাপ CAD ও ডিজিটাল বিভাজন'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.image_outlined),
+            tooltip: 'মৌজা নকশা লোড করুন',
+            onPressed: _showSheetSourceMenu,
+          ),
+          IconButton(
+            icon: Icon(_isZoomPanMode ? Icons.pan_tool : Icons.touch_app),
+            tooltip: _isZoomPanMode ? 'জুম/প্যান মোড চালু' : 'আঁকা/পিন মোড চালু',
+            onPressed: () => setState(() => _isZoomPanMode = !_isZoomPanMode),
+          ),
           IconButton(
             icon: Icon(_snapToVertex ? Icons.near_me : Icons.near_me_disabled),
             tooltip: _snapToVertex ? 'শীর্ষবিন্দু স্ন্যাপিং চালু' : 'স্ন্যাপিং বন্ধ',
@@ -195,90 +302,176 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
               ),
             ),
 
-          // Interactive CAD View with LayoutBuilder & 1:1 Touch Loupe
+          // Interactive CAD View with Synchronized Zoom/Pan & 1:1 Touch Loupe
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+                final loupeTouch = _touchPosition != null
+                    ? MatrixUtils.transformPoint(_transformationController.value, _touchPosition!)
+                    : null;
+
+                final sheetLayer = (_sheetSource != null && _showSheet)
+                    ? Opacity(
+                        opacity: _sheetOpacity,
+                        child: MouzaSheetImage(source: _sheetSource!, fit: BoxFit.contain),
+                      )
+                    : const SizedBox.shrink();
+
                 return Stack(
                   children: [
-                    GestureDetector(
-                      onTapDown: (details) {
-                        final pos = _snapPos(details.localPosition);
-                        if (_isSplitMode) {
-                          setState(() {
-                            if (_splitStart == null) {
-                              _splitStart = pos;
-                            } else if (_splitEnd == null) {
-                              _splitEnd = pos;
-                              _isSplitMode = false;
-                              _calculateSplitDimension();
-                            }
-                          });
-                          return;
-                        }
+                    InteractiveViewer(
+                      transformationController: _transformationController,
+                      minScale: 0.8,
+                      maxScale: 8.0,
+                      boundaryMargin: const EdgeInsets.all(400),
+                      panEnabled: _isZoomPanMode,
+                      scaleEnabled: _isZoomPanMode,
+                      onInteractionEnd: (_) {
+                        setState(() => _canvasZoom = _transformationController.value.getMaxScaleOnAxis());
+                      },
+                      child: SizedBox(
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                        child: Stack(
+                          children: [
+                            if (_sheetSource != null && _showSheet) Positioned.fill(child: sheetLayer),
+                            IgnorePointer(
+                              ignoring: _isZoomPanMode,
+                              child: GestureDetector(
+                                onTapDown: (details) {
+                                  final pos = _snapPos(details.localPosition);
+                                  if (_isSplitMode) {
+                                    setState(() {
+                                      if (_splitStart == null) {
+                                        _splitStart = pos;
+                                      } else if (_splitEnd == null) {
+                                        _splitEnd = pos;
+                                        _isSplitMode = false;
+                                        _calculateSplitDimension();
+                                      }
+                                    });
+                                    return;
+                                  }
 
-                        int? found;
-                        for (int i = 0; i < _vertices.length; i++) {
-                          if ((_vertices[i] - details.localPosition).distance < 24) {
-                            found = i;
-                            break;
-                          }
-                        }
-                        if (found != null) {
-                          setState(() => _selectedVertexIndex = found);
-                        } else {
-                          _pushUndo();
-                          setState(() {
-                            _vertices.add(pos);
-                            _splitStart = null;
-                            _splitEnd = null;
-                          });
-                        }
-                      },
-                      onPanDown: (details) {
-                        int? found;
-                        for (int i = 0; i < _vertices.length; i++) {
-                          if ((_vertices[i] - details.localPosition).distance < 24) {
-                            found = i;
-                            break;
-                          }
-                        }
-                        _dragSnapshotSaved = false;
-                        setState(() {
-                          _selectedVertexIndex = found;
-                          _touchPosition = details.localPosition;
-                          _isTouchActive = true;
-                        });
-                      },
-                      onPanUpdate: (details) {
-                        final snapped = _snapPos(details.localPosition);
-                        if (_selectedVertexIndex != null && !_dragSnapshotSaved) {
-                          _pushUndo();
-                          _dragSnapshotSaved = true;
-                        }
-                        setState(() {
-                          _touchPosition = details.localPosition;
-                          if (_selectedVertexIndex != null && _selectedVertexIndex! < _vertices.length) {
-                            _vertices[_selectedVertexIndex!] = snapped;
-                          }
-                        });
-                      },
-                      onPanEnd: (_) => setState(() {
-                        _selectedVertexIndex = null;
-                        _isTouchActive = false;
-                        _dragSnapshotSaved = false;
-                      }),
-                      child: cadContent,
+                                  int? found;
+                                  final hit = (24.0 / _canvasZoom).clamp(8.0, 28.0);
+                                  for (int i = 0; i < _vertices.length; i++) {
+                                    if ((_vertices[i] - details.localPosition).distance < hit) {
+                                      found = i;
+                                      break;
+                                    }
+                                  }
+                                  if (found != null) {
+                                    setState(() => _selectedVertexIndex = found);
+                                  } else {
+                                    _pushUndo();
+                                    setState(() {
+                                      _vertices.add(pos);
+                                      _splitStart = null;
+                                      _splitEnd = null;
+                                    });
+                                  }
+                                },
+                                onPanDown: (details) {
+                                  int? found;
+                                  final hit = (24.0 / _canvasZoom).clamp(8.0, 28.0);
+                                  for (int i = 0; i < _vertices.length; i++) {
+                                    if ((_vertices[i] - details.localPosition).distance < hit) {
+                                      found = i;
+                                      break;
+                                    }
+                                  }
+                                  _dragSnapshotSaved = false;
+                                  setState(() {
+                                    _selectedVertexIndex = found;
+                                    _touchPosition = details.localPosition;
+                                    _isTouchActive = true;
+                                  });
+                                },
+                                onPanUpdate: (details) {
+                                  final snapped = _snapPos(details.localPosition);
+                                  if (_selectedVertexIndex != null && !_dragSnapshotSaved) {
+                                    _pushUndo();
+                                    _dragSnapshotSaved = true;
+                                  }
+                                  setState(() {
+                                    _touchPosition = details.localPosition;
+                                    if (_selectedVertexIndex != null && _selectedVertexIndex! < _vertices.length) {
+                                      _vertices[_selectedVertexIndex!] = snapped;
+                                    }
+                                  });
+                                },
+                                onPanEnd: (_) => setState(() {
+                                  _selectedVertexIndex = null;
+                                  _isTouchActive = false;
+                                  _dragSnapshotSaved = false;
+                                }),
+                                child: cadContent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Floating CAD Zoom controls
+                    Positioned(
+                      bottom: 12,
+                      right: 12,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xCC0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF475569)),
+                            ),
+                            child: Text(
+                              '${_canvasZoom.toStringAsFixed(1)}x',
+                              style: const TextStyle(color: Colors.amberAccent, fontSize: 10.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'cad_zoom_in',
+                            backgroundColor: const Color(0xE60F172A),
+                            foregroundColor: Colors.white,
+                            onPressed: () => _setCanvasZoom(_canvasZoom * 1.4, canvasSize),
+                            child: const Icon(Icons.zoom_in, size: 20),
+                          ),
+                          const SizedBox(height: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'cad_zoom_out',
+                            backgroundColor: const Color(0xE60F172A),
+                            foregroundColor: Colors.white,
+                            onPressed: () => _setCanvasZoom(_canvasZoom / 1.4, canvasSize),
+                            child: const Icon(Icons.zoom_out, size: 20),
+                          ),
+                        ],
+                      ),
                     ),
 
                     // Touch Loupe during CAD editing with exact canvasSize alignment
-                    if (_isTouchActive && _touchPosition != null)
+                    if (_isTouchActive && loupeTouch != null && !_isZoomPanMode)
                       TouchMagnifierLoupe(
-                        touchPosition: _touchPosition!,
+                        touchPosition: loupeTouch,
                         scaleFactor: 2.2,
                         sourceSize: canvasSize,
-                        child: cadContent,
+                        child: Transform(
+                          transform: _transformationController.value,
+                          child: SizedBox(
+                            width: canvasSize.width,
+                            height: canvasSize.height,
+                            child: Stack(
+                              children: [
+                                if (_sheetSource != null && _showSheet) Positioned.fill(child: sheetLayer),
+                                cadContent,
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                   ],
                 );
@@ -551,6 +744,7 @@ class _CadCanvasPainter extends CustomPainter {
   final bool showAngles;
   final Offset? splitStart;
   final Offset? splitEnd;
+  final bool transparentBg;
 
   _CadCanvasPainter({
     required this.vertices,
@@ -559,11 +753,14 @@ class _CadCanvasPainter extends CustomPainter {
     required this.showAngles,
     this.splitStart,
     this.splitEnd,
+    this.transparentBg = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0F172A));
+    if (!transparentBg) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0F172A));
+    }
 
     final dotPaint = Paint()..color = const Color(0xFF334155)..strokeWidth = 1.0;
     for (double x = 0; x < size.width; x += gridSpacing) {

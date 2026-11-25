@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../history/models/calculation_history_item.dart';
@@ -24,8 +25,18 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
   double _scale = 1.0;
   Offset _panOffset = Offset.zero;
 
-  // Selected overlay source: null = vector demo grid, or asset path
+  // Selected overlay source: null = vector demo grid, asset path, or local device path
   String? _selectedSheetAsset;
+  bool _moveSheetMode = true; // true = drag moves Mouza sheet, false = drag moves underlying satellite map
+
+  Future<void> _pickDeviceSheet() async {
+    final picked = await DeviceFileService.instance.pickMouzaSheet();
+    if (!mounted || picked == null) return;
+    setState(() => _selectedSheetAsset = picked.path);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ওভারলে নকশা লোড হয়েছে: ${picked.name}'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
 
   static const List<Map<String, String?>> _sheetOptions = [
     {'label': 'ভেক্টর শিট', 'asset': null},
@@ -178,19 +189,22 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                                 ),
                               ),
                             );
-                      return GestureDetector(
-                        onPanUpdate: (details) {
-                          setState(() => _panOffset += details.delta);
-                        },
-                        child: Transform.translate(
-                          offset: _panOffset,
-                          child: Transform.rotate(
-                            angle: (_rotation * 3.1415926535) / 180.0,
-                            child: Transform.scale(
-                              scale: _scale,
-                              child: Opacity(
-                                opacity: _opacity,
-                                child: sheetContent,
+                      return IgnorePointer(
+                        ignoring: !_moveSheetMode,
+                        child: GestureDetector(
+                          onPanUpdate: (details) {
+                            setState(() => _panOffset += details.delta);
+                          },
+                          child: Transform.translate(
+                            offset: _panOffset,
+                            child: Transform.rotate(
+                              angle: (_rotation * 3.1415926535) / 180.0,
+                              child: Transform.scale(
+                                scale: _scale,
+                                child: Opacity(
+                                  opacity: _opacity,
+                                  child: sheetContent,
+                                ),
                               ),
                             ),
                           ),
@@ -262,18 +276,40 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _sheetOptions.map((opt) {
-                      final isSel = _selectedSheetAsset == opt['asset'];
-                      return Padding(
+                    children: [
+                      Padding(
                         padding: const EdgeInsets.only(right: 6, bottom: 6),
-                        child: ChoiceChip(
-                          label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
-                          selected: isSel,
-                          selectedColor: AppColors.primaryGreen,
-                          onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                        child: ActionChip(
+                          avatar: Icon(_moveSheetMode ? Icons.open_with : Icons.lock, size: 15, color: Colors.white),
+                          label: Text(
+                            _moveSheetMode ? 'শিট সরান' : 'ম্যাপ সরান (লক)',
+                            style: const TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: _moveSheetMode ? const Color(0xFF0284C7) : const Color(0xFFD97706),
+                          onPressed: () => setState(() => _moveSheetMode = !_moveSheetMode),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6, bottom: 6),
+                        child: ActionChip(
+                          avatar: const Icon(Icons.folder_open, size: 15),
+                          label: const Text('ফোন থেকে ফাইল', style: TextStyle(fontSize: 11.5)),
+                          onPressed: _pickDeviceSheet,
+                        ),
+                      ),
+                      ..._sheetOptions.map((opt) {
+                        final isSel = _selectedSheetAsset == opt['asset'];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6, bottom: 6),
+                          child: ChoiceChip(
+                            label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
+                            selected: isSel,
+                            selectedColor: AppColors.primaryGreen,
+                            onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
                 Row(

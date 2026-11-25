@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/polygon_geometry.dart';
@@ -36,10 +39,23 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   List<LatLngPoint>? _partitionSplitLine;
   final List<List<LatLngPoint>> _undoStack = [];
   final List<List<LatLngPoint>> _redoStack = [];
+  bool _hasEditedPolygon = false;
+
+  // Real Device Live GPS State
+  LatLngPoint? _userGpsLocation;
+  double? _gpsAccuracyMeters;
+  bool _isLocatingGps = false;
+  StreamSubscription<Position>? _gpsSubscription;
 
   // Computed metrics
   double _areaSqFt = 0.0;
   double _perimeterFt = 0.0;
+
+  @override
+  void dispose() {
+    _gpsSubscription?.cancel();
+    super.dispose();
+  }
 
   void _recordUndoSnapshot() {
     _undoStack.add(List<LatLngPoint>.from(_surveyPoints));
@@ -71,6 +87,64 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   void initState() {
     super.initState();
     _recompute();
+    _fetchLiveLocation(jumpToUser: true, silent: true);
+  }
+
+  Future<void> _fetchLiveLocation({bool jumpToUser = true, bool silent = false}) async {
+    if (_isLocatingGps) return;
+    setState(() => _isLocatingGps = true);
+
+    final res = await LocationService.instance.getCurrentLocation();
+    if (!mounted) return;
+    setState(() => _isLocatingGps = false);
+
+    if (res.success && res.latitude != null && res.longitude != null) {
+      final pt = LatLngPoint(res.latitude!, res.longitude!);
+      setState(() {
+        _userGpsLocation = pt;
+        _gpsAccuracyMeters = res.accuracyMeters;
+      });
+      if (jumpToUser) {
+        _mapController.jumpTo(pt.latitude, pt.longitude, zoom: 18.0);
+        // If user hasn't started custom plotting yet, center starter plot or let user plot here
+        if (!_hasEditedPolygon && !silent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'আপনার বর্তমান GPS অবস্থানে ম্যাপ সেট হয়েছে (±${res.accuracyMeters?.toStringAsFixed(1) ?? "?"} মিটার)',
+              ),
+              backgroundColor: AppColors.primaryGreen,
+            ),
+          );
+        }
+      }
+    } else if (!silent && res.errorMessageBangla != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.errorMessageBangla!),
+          backgroundColor: AppColors.accentCrimson,
+        ),
+      );
+    }
+  }
+
+  void _toggleGpsWalkMode(bool enabled) {
+    setState(() => _isGpsWalkMode = enabled);
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+    if (enabled) {
+      _fetchLiveLocation(jumpToUser: true, silent: false);
+      try {
+        _gpsSubscription = LocationService.instance.watchPosition().listen((pos) {
+          if (!mounted) return;
+          final pt = LatLngPoint(pos.latitude, pos.longitude);
+          setState(() {
+            _userGpsLocation = pt;
+            _gpsAccuracyMeters = pos.accuracy;
+          });
+        }, onError: (_) {});
+      } catch (_) {}
+    }
   }
 
   void _recompute() {
@@ -134,18 +208,23 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
   }
 
   void _addCurrentGpsPoint() {
-    final center = _mapController.currentCenter;
+    final targetPt = _userGpsLocation ?? _mapController.currentCenter;
+    final usedRealGps = _userGpsLocation != null;
+    _hasEditedPolygon = true;
     _recordUndoSnapshot();
     setState(() {
-      _surveyPoints.add(center);
+      _surveyPoints.add(targetPt);
       _selectedVertexIndex = _surveyPoints.length - 1;
       _recompute();
     });
+    _mapController.jumpTo(targetPt.latitude, targetPt.longitude, zoom: math.max(_mapController.currentZoom, 18.0));
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'ম্যাপ সেন্টার পিন ${BanglaNumerals.toBangla(_surveyPoints.length)} যুক্ত হয়েছে! (${center.latitude.toStringAsFixed(6)}° N, ${center.longitude.toStringAsFixed(6)}° E)',
+          usedRealGps
+              ? 'লাইভ GPS পিন ${BanglaNumerals.toBangla(_surveyPoints.length)} যুক্ত হয়েছে! (${targetPt.latitude.toStringAsFixed(6)}° N, ±${_gpsAccuracyMeters?.toStringAsFixed(1) ?? "?"}m)'
+              : 'ম্যাপ সেন্টার পিন ${BanglaNumerals.toBangla(_surveyPoints.length)} যুক্ত হয়েছে! (${targetPt.latitude.toStringAsFixed(6)}° N)',
         ),
         backgroundColor: AppColors.primaryGreen,
         duration: const Duration(seconds: 2),
@@ -966,7 +1045,7 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                 Switch(
                   value: _isGpsWalkMode,
                   activeColor: Colors.greenAccent,
-                  onChanged: (val) => setState(() => _isGpsWalkMode = val),
+                  onChanged: _toggleGpsWalkMode,
                 ),
               ],
             ),
@@ -980,8 +1059,12 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                 EsriSatelliteMapView(
                   controller: _mapController,
                   surveyPoints: _surveyPoints,
-                  onPointsChanged: (pts) {
+                  onDragBegin: () {
+                    _hasEditedPolygon = true;
                     _recordUndoSnapshot();
+                  },
+                  onPointsChanged: (pts) {
+                    _hasEditedPolygon = true;
                     setState(() {
                       _surveyPoints = pts;
                       _recompute();
@@ -997,6 +1080,8 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   showCenterReticle: _isGpsWalkMode || _activeTool == 'Point',
                   showNudgeDpad: true,
                   partitionSplitLine: _partitionSplitLine,
+                  userLocation: _userGpsLocation,
+                  userAccuracyMeters: _gpsAccuracyMeters,
                   onVertexSelected: (idx) => setState(() => _selectedVertexIndex = idx),
                 ),
 
@@ -1009,7 +1094,10 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xE00F172A),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
+                      border: Border.all(
+                        color: _userGpsLocation != null ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                        width: 1.2,
+                      ),
                       boxShadow: const [
                         BoxShadow(color: Color(0x4D000000), blurRadius: 6, offset: Offset(0, 2)),
                       ],
@@ -1020,14 +1108,16 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF38BDF8),
+                          decoration: BoxDecoration(
+                            color: _userGpsLocation != null ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'WGS84 জিওডেসিক • ${_surveyPoints.length} পিন • Mapbox & ESRI HD',
+                          _userGpsLocation != null
+                              ? 'GPS সক্রিয় (±${_gpsAccuracyMeters?.toStringAsFixed(0) ?? "?"}m) • ${_surveyPoints.length} পিন'
+                              : 'ম্যানুয়াল মোড • ${_surveyPoints.length} পিন • ESRI/Mapbox',
                           style: const TextStyle(
                             color: Color(0xFFE2E8F0),
                             fontSize: 10.5,
@@ -1080,12 +1170,27 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
                   ),
                 ),
 
-                // Zoom Buttons on bottom-right of map
+                // My Location GPS + Zoom Buttons on bottom-right of map
                 Positioned(
                   bottom: 16,
                   right: 12,
                   child: Column(
                     children: [
+                      FloatingActionButton.small(
+                        heroTag: 'survey_my_gps',
+                        backgroundColor: _userGpsLocation != null ? const Color(0xFF0F5A38) : const Color(0xE60F172A),
+                        foregroundColor: Colors.white,
+                        onPressed: () => _fetchLiveLocation(jumpToUser: true, silent: false),
+                        tooltip: 'আমার বর্তমান GPS অবস্থান',
+                        child: _isLocatingGps
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.my_location, size: 20),
+                      ),
+                      const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'survey_zoom_in',
                         backgroundColor: const Color(0xE60F172A),

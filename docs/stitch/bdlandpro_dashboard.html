@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html lang="bn"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "primary": "#004126", "secondary": "#7a5900", "on-tertiary-fixed": "#001d31", "on-surface": "#131b2e", "primary-fixed": "#abf2c5", "on-tertiary-container": "#85c7ff", "on-secondary-fixed": "#261900", "surface-container-lowest": "#ffffff", "on-error": "#ffffff", "outline": "#707971", "surface-container-low": "#f2f3ff", "secondary-fixed-dim": "#f6be45", "tertiary-fixed-dim": "#93ccff", "on-secondary-fixed-variant": "#5d4200", "secondary-container": "#ffc64d", "surface-container-highest": "#dae2fd", "primary-container": "#0f5a38", "on-primary-container": "#8acfa4", "on-tertiary": "#ffffff", "inverse-primary": "#90d6aa", "surface-tint": "#256a47", "tertiary": "#003b5d", "surface-container": "#eaedff", "on-background": "#131b2e", "error-container": "#ffdad6", "tertiary-fixed": "#cce5ff", "primary-fixed-dim": "#90d6aa", "on-surface-variant": "#404942", "on-primary": "#ffffff", "surface-container-high": "#e2e7ff", "on-secondary-container": "#725200", "surface-variant": "#dae2fd", "on-secondary": "#ffffff", "on-error-container": "#93000a", "surface-bright": "#faf8ff", "error": "#ba1a1a", "on-tertiary-fixed-variant": "#004b73", "secondary-fixed": "#ffdea3", "on-primary-fixed-variant": "#005231", "inverse-on-surface": "#eef0ff", "background": "#faf8ff", "inverse-surface": "#283044", "on-primary-fixed": "#002111", "tertiary-container": "#00537f", "surface-dim": "#d2d9f4", "surface": "#faf8ff", "outline-variant": "#bfc9c0" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-2xl": "2rem", "gutter": "0.75rem", "margin": "1rem", "gutter-tablet": "1rem", "margin-tablet": "1.5rem", "space-xs": "0.25rem", "space-xl": "1.5rem", "space-lg": "1rem", "space-sm": "0.5rem", "space-md": "0.75rem" }, "fontFamily": { "label-md": ["JetBrains Mono"], "display-lg": ["Noto Sans"], "body-md": ["Noto Sans"], "data-metric": ["JetBrains Mono"], "body-lg": ["Noto Sans"], "headline-lg": ["Noto Sans"], "label-sm": ["JetBrains Mono"], "label-lg": ["JetBrains Mono"], "title-md": ["Noto Sans"], "headline-md": ["Noto Sans"] }, "fontSize": { "label-md": ["11px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "display-lg": ["34px", { "lineHeight": "42px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "data-metric": ["18px", { "lineHeight": "22px", "fontWeight": "700" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-lg": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "400" }], "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }], "title-md": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }] } } } }</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-primary-container shadow-[0_1px_8px_rgba(0,0,0,0.12)]"><div class="h-16 px-margin flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="w-9 h-9 rounded bg-primary flex items-center justify-center text-secondary-fixed shrink-0"><span class="material-symbols-outlined text-[20px]">architecture</span></div><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-secondary-fixed tracking-wider uppercase truncate">BDLandPro</span><span class="font-title-md text-title-md text-on-primary font-semibold leading-tight truncate">Mouza Map</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="h-9 px-space-sm bg-primary/60 rounded flex items-center gap-space-xs text-on-primary-container active:bg-primary"><span class="material-symbols-outlined text-[16px] text-secondary-fixed">layers</span><span class="font-label-sm text-label-sm font-medium">মৌজা নির্বাচন</span><span class="material-symbols-outlined text-[14px]">expand_more</span></button><button class="w-9 h-9 rounded flex items-center justify-center text-on-primary active:bg-primary"><span class="material-symbols-outlined text-[20px]">search</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-20 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- Active Field Cadastral Header & Status Bar -->
+<section class="px-margin pt-space-md pb-space-xs flex flex-col gap-space-sm">
+<!-- Breadcrumb & Sheet Pill -->
+<div class="flex items-center justify-between gap-space-sm bg-surface-container-high px-space-md py-space-sm rounded-xl shadow-sm">
+<div class="flex items-center gap-space-xs min-w-0">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0">pin_drop</span>
+<div class="flex flex-col min-w-0">
+<span class="font-body-md text-body-md font-semibold text-on-surface truncate">আমিনপুর (জে.এল. ৩৪), সাভার, ঢাকা</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant tracking-wide">আর.এস জরিপ রেকর্ড মানচিত্র</span>
+</div>
+</div>
+<div class="shrink-0 flex items-center gap-1 bg-secondary-container/30 px-2 py-1 rounded text-on-secondary-container">
+<span class="material-symbols-outlined text-[14px]">map</span>
+<span class="font-label-md text-label-md font-bold">শীট: ০২</span>
+</div>
+</div>
+<!-- RTK Satellite Status Pill -->
+<div class="flex items-center justify-between bg-surface-container-lowest px-space-md py-space-xs rounded-xl shadow-sm">
+<div class="flex items-center gap-space-xs min-w-0">
+<div class="relative flex items-center justify-center w-3 h-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-container opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary-container"></span>
+</div>
+<span class="font-label-md text-label-md font-bold text-primary-container truncate">3D RTK ফিক্সড (±২ মি.মি.)</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm shrink-0">
+<span class="material-symbols-outlined text-[15px] text-secondary">satellite_alt</span>
+<span>২৮ স্যাটেলাইট (PDOP ১.১২)</span>
+</div>
+</div>
+<!-- Quick Search Field -->
+<div class="relative flex items-center bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant pl-space-md">search</span>
+<input class="w-full bg-transparent px-space-sm py-3 text-on-surface font-body-md text-body-md placeholder:text-on-surface-variant/70 focus:outline-none" placeholder="দাগ নং, খতিয়ান বা মালিকের নাম খুঁজুন..." type="text"/>
+<button aria-label="QR বা বারকোড স্ক্যান" class="pr-space-md pl-space-xs flex items-center justify-center text-primary-container active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]">qr_code_scanner</span>
+</button>
+</div>
+</section>
+<!-- Featured Action Cards (Hero Deck) -->
+<section class="px-margin pt-space-xs pb-space-sm flex flex-col gap-space-md">
+<!-- Card 1: Live GPS Satellite Survey -->
+<div class="relative overflow-hidden rounded-xl bg-primary-container text-on-primary p-space-lg shadow-md flex flex-col gap-space-md">
+<!-- Ambient Visual Cadastral Vector Decor -->
+<svg class="absolute right-0 top-0 w-36 h-36 opacity-10 pointer-events-none -mr-4 -mt-4 text-on-primary" fill="currentColor" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="48" stroke="currentColor" stroke-width="2"></circle>
+<circle cx="50" cy="50" fill="none" r="32" stroke="currentColor" stroke-dasharray="4 2" stroke-width="1.5"></circle>
+<line stroke="currentColor" stroke-width="1.5" x1="50" x2="50" y1="2" y2="98"></line>
+<line stroke="currentColor" stroke-width="1.5" x1="2" x2="98" y1="50" y2="50"></line>
+</svg>
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed"></span>
+<span class="font-label-sm text-label-sm text-secondary-fixed tracking-wider uppercase font-semibold">সরাসরি ফিল্ড রিসিভার</span>
+</div>
+<h2 class="font-headline-md text-headline-md font-bold text-on-primary mt-1">লাইভ GPS স্যাটেলাইট জরিপ</h2>
+<p class="font-body-md text-body-md text-on-primary-container mt-0.5">সেন্টিমিটার নির্ভুলতা ও রিয়েলটাইম বাউন্ডারি ট্র্যাকিং</p>
+</div>
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-secondary-fixed shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[22px]">radar</span>
+</div>
+</div>
+<!-- Live Geodetic Coordinates Strip -->
+<div class="bg-primary/50 backdrop-blur-md rounded-lg p-space-sm flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-primary-container font-label-sm text-label-sm">
+<span>প্রক্ষেপণ স্থানাঙ্ক (BTM)</span>
+<span class="text-secondary-fixed font-bold">EPSG: 3106</span>
+</div>
+<div class="flex items-center justify-between font-label-md text-label-md text-on-primary tracking-wide">
+<span>E: ৫৪২,৩১০.১২৮</span>
+<span>N: ২৬৪,২১৮০.৪৫২</span>
+</div>
+</div>
+<button class="w-full h-11 bg-secondary-fixed text-on-secondary-fixed font-title-md text-title-md font-bold rounded-lg flex items-center justify-center gap-space-sm active:bg-secondary-fixed-dim transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+<span>জরিপ শুরু করুন</span>
+</button>
+</div>
+<!-- Card 2: Mouza Map Zoom & CAD Workspace -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-lowest text-on-surface p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-label-sm text-label-sm text-primary-container font-bold tracking-wider uppercase">ভেক্টর শিট এডিটর</span>
+</div>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface mt-1">মৌজা ম্যাপ জুম ও CAD পরিমাপ</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">গুনিয়া স্কেল, একর-শতাংশ হিসাব ও দাগ বিভাজন</p>
+</div>
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[22px]">square_foot</span>
+</div>
+</div>
+<!-- Map Spec Pill -->
+<div class="bg-surface-container px-space-md py-space-xs rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-secondary">straighten</span>
+<span>স্কেল মানদণ্ড: ১৬" = ১ মাইল</span>
+</div>
+<span class="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded font-bold">DXF/GEO</span>
+</div>
+<button class="w-full h-11 bg-primary text-on-primary font-title-md text-title-md font-bold rounded-lg flex items-center justify-center gap-space-sm active:bg-primary-container transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">gesture</span>
+<span>ম্যাপ ক্যানভাস খুলুন</span>
+</button>
+</div>
+</section>
+<!-- Categorized Survey Engineering Tools -->
+<section class="px-margin pt-space-xs pb-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-primary-container">handyman</span>
+<h3 class="font-title-md text-title-md font-bold text-on-surface">প্রফেশনাল জরিপ টুলস ও ক্যালকুলেটর</h3>
+</div>
+<button class="font-label-sm text-label-sm font-bold text-primary-container bg-surface-container px-2 py-1 rounded hover:bg-surface-container-high" type="button">
+        সব দেখুন
+      </button>
+</div>
+<!-- 2-Column Responsive Cadastral Grid -->
+<div class="grid grid-cols-2 gap-space-md">
+<!-- Tool 1: Gunia Scale -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-secondary-fixed/50 flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[20px]">straighten</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold">১০০ লিংক</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">পিতলের গুনিয়া স্কেল</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">১০০ লিংক ও ফুট নির্ভুল ডিজিটাল স্কেলিং ওভারলে</p>
+</div>
+</div>
+<!-- Tool 2: Land & Khatian Calc -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[20px]">calculate</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">লাইভ সূত্র</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">জমি ও খতিয়ান ক্যালক</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">শতাংশ, কাঠা, বিঘা ও আনা-গণ্ডা অটো কনভার্টার</p>
+</div>
+</div>
+<!-- Tool 3: Plot Partition & Farayez -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">call_split</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary-container font-bold">অংশ বণ্টন</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">দাগ বিভাজন ও বাউন্ডারি</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">ফারায়েজ ও যৌথ মালিকানা নিখুঁত জ্যামিতিক অংশ বণ্টন</p>
+</div>
+</div>
+<!-- Tool 4: Compass & Traverse -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-secondary-fixed/50 flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold">৩৬০° কোণ</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">কম্পাস ও ট্রাভার্স</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">বেয়ারিং, অভ্যন্তরীণ কোণ ও অফসেট টেবিলেশন ডাটা</p>
+</div>
+</div>
+<!-- Tool 5: Total Station Data Importer -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">file_open</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">CSV / DXF</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">টোটাল স্টেশন ডেটা</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">CSV, KML, DXF ফিল্ড ফাইল সরাসরি প্লটিং ও সিঙ্ক</p>
+</div>
+</div>
+<!-- Tool 6: Khatian Porcha & Dag Index -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between gap-space-sm hover:shadow-md transition-shadow active:bg-surface-container-low cursor-pointer">
+<div class="flex items-center justify-between">
+<div class="w-9 h-9 rounded-lg bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[20px]">assignment</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">CS/SA/RS/BS</span>
+</div>
+<div>
+<h4 class="font-title-md text-title-md font-bold text-on-surface leading-tight">খতিয়ান পর্চা ও সূচি</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">মালিকানা রেকর্ড, দাগের হিসেব ও ঐতিহাসিক পর্চা ডাটাবেস</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Offline Ready Status & Field Sync Indicator -->
+<section class="px-margin pb-space-lg">
+<div class="bg-surface-container px-space-md py-space-sm rounded-xl flex items-center justify-between gap-space-sm shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">cloud_done</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-title-md text-title-md font-bold text-on-surface">অফলাইন ক্যাড সক্রিয়</span>
+<span class="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-1.5 py-0.2 rounded">লোকাল</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant truncate">সাভার আমিনপুর মৌজার সমস্ত শিট অফলাইনে সংরক্ষিত (৪.৮ মেগাবাইট)</span>
+</div>
+</div>
+<button aria-label="সিঙ্ক রিফ্রেশ" class="shrink-0 p-2 text-primary active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+</button>
+</div>
+</section>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(19,27,46,0.06)]" data-active-classes="text-primary-container font-semibold"><div class="flex items-center justify-around h-16 px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-primary-container font-semibold" data-path="mouza-map" href="#"><span class="material-symbols-outlined text-[20px]">map</span><span class="font-label-sm text-label-sm mt-0.5">মৌজা ম্যাপ</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant" data-path="plots-and-khatian" href="#"><span class="material-symbols-outlined text-[20px]">grid_on</span><span class="font-label-sm text-label-sm mt-0.5">দাগ ও খতিয়ান</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant" data-path="gps-survey" href="#"><div class="w-7 h-7 rounded bg-primary-container/10 flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">my_location</span></div><span class="font-label-sm text-label-sm mt-0.5">GPS সার্ভে</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant" data-path="tools-and-calc" href="#"><span class="material-symbols-outlined text-[20px]">calculate</span><span class="font-label-sm text-label-sm mt-0.5">টুলস ও হিসাব</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant" data-path="profile-archive" href="#"><span class="material-symbols-outlined text-[20px]">folder_shared</span><span class="font-label-sm text-label-sm mt-0.5">প্রোফাইল</span></a></div></nav></body></html>

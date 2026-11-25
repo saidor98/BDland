@@ -72,6 +72,9 @@ class EsriSatelliteMapView extends StatefulWidget {
   final bool showNudgeDpad;
   final List<LatLngPoint>? partitionSplitLine;
   final ValueChanged<int?>? onVertexSelected;
+  final VoidCallback? onDragBegin;
+  final LatLngPoint? userLocation;
+  final double? userAccuracyMeters;
   final void Function(String url)? onAttributionTap;
 
   const EsriSatelliteMapView({
@@ -95,6 +98,9 @@ class EsriSatelliteMapView extends StatefulWidget {
     this.showNudgeDpad = false,
     this.partitionSplitLine,
     this.onVertexSelected,
+    this.onDragBegin,
+    this.userLocation,
+    this.userAccuracyMeters,
     this.onAttributionTap,
   });
 
@@ -379,6 +385,7 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
     _draggedVertexIndex = null;
     for (int i = 0; i < screenPoints.length; i++) {
       if ((screenPoints[i] - pos).distance < 28.0) {
+        widget.onDragBegin?.call();
         setState(() {
           _draggedVertexIndex = i;
           _selectedVertexIndex = i;
@@ -649,6 +656,16 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
             ?.map((p) => _latLngToScreen(p, size))
             .toList();
 
+        Offset? userScreenPoint;
+        double userAccuracyPx = 18.0;
+        if (widget.userLocation != null) {
+          userScreenPoint = _latLngToScreen(widget.userLocation!, size);
+          final meters = widget.userAccuracyMeters ?? 8.0;
+          final cosLat = math.cos(widget.userLocation!.latitude * math.pi / 180.0).abs().clamp(0.2, 1.0);
+          final metersPerPixel = (40075016.686 * cosLat) / (256.0 * math.pow(2.0, _zoom));
+          userAccuracyPx = (meters / metersPerPixel).clamp(12.0, 90.0);
+        }
+
         return Stack(
           children: [
             // 1. Interactive Satellite Map Tile Grid
@@ -676,6 +693,8 @@ class _EsriSatelliteMapViewState extends State<EsriSatelliteMapView> {
                       showDimensions: widget.showDimensions,
                       showAngles: widget.showAngles,
                       partitionScreenPoints: partitionScreenPoints,
+                      userScreenPoint: userScreenPoint,
+                      userAccuracyRadiusPx: userAccuracyPx,
                     ),
                   ),
                 ],
@@ -1227,6 +1246,8 @@ class _SatelliteCadastralPainter extends CustomPainter {
   final bool showDimensions;
   final bool showAngles;
   final List<Offset>? partitionScreenPoints;
+  final Offset? userScreenPoint;
+  final double userAccuracyRadiusPx;
 
   _SatelliteCadastralPainter({
     required this.points,
@@ -1236,10 +1257,32 @@ class _SatelliteCadastralPainter extends CustomPainter {
     required this.showDimensions,
     required this.showAngles,
     this.partitionScreenPoints,
+    this.userScreenPoint,
+    this.userAccuracyRadiusPx = 18.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Draw live user GPS position dot + accuracy halo even if polygon is empty
+    if (userScreenPoint != null) {
+      final up = userScreenPoint!;
+      canvas.drawCircle(
+        up,
+        userAccuracyRadiusPx,
+        Paint()..color = const Color(0x332563EB),
+      );
+      canvas.drawCircle(
+        up,
+        userAccuracyRadiusPx,
+        Paint()
+          ..color = const Color(0x802563EB)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+      canvas.drawCircle(up, 9.0, Paint()..color = Colors.white);
+      canvas.drawCircle(up, 6.5, Paint()..color = const Color(0xFF2563EB));
+    }
+
     if (screenPoints.isEmpty) return;
 
     // 1. Draw glowing cyan boundary polygon

@@ -8,7 +8,9 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/pdf_report_helper.dart';
 import '../../../core/utils/polygon_geometry.dart';
@@ -55,6 +57,16 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   bool _showScannedSheet = true;
   double _sheetOpacity = 0.85;
   String? _customSheetImageUrl;
+
+  // Interactive Zoom & Pan for inspecting and measuring tiny Mouza plots
+  final TransformationController _transformationController = TransformationController();
+  bool _isZoomPanMode = false;
+  bool _dragSnapshotSaved = false;
+  double _canvasZoom = 1.0;
+
+  // Real device GPS reading for Mouza reference dialog
+  DeviceLocationResult? _lastGpsResult;
+  bool _isFetchingGps = false;
 
   Widget _buildSheetErrorState() {
     return Center(
@@ -122,78 +134,173 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     );
   }
 
-  void _showGpsLocationDialog() {
+  void _setCanvasZoom(double nextScale, Size viewportSize) {
+    final clamped = nextScale.clamp(0.8, 8.0);
+    final current = _transformationController.value;
+    final currentScale = current.getMaxScaleOnAxis();
+    if (currentScale <= 0) return;
+    final center = Offset(viewportSize.width / 2.0, viewportSize.height / 2.0);
+    final sceneCenter = _transformationController.toScene(center);
+    final updated = Matrix4.identity()
+      ..translate(center.dx, center.dy)
+      ..scale(clamped)
+      ..translate(-sceneCenter.dx, -sceneCenter.dy);
+    _transformationController.value = updated;
+    setState(() => _canvasZoom = clamped);
+  }
+
+  void _resetCanvasZoom() {
+    _transformationController.value = Matrix4.identity();
+    setState(() => _canvasZoom = 1.0);
+  }
+
+  Future<void> _pickCustomDeviceSheet() async {
+    final picked = await DeviceFileService.instance.pickMouzaSheet();
+    if (!mounted) return;
+    if (picked == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('কোনো ফাইল নির্বাচন করা হয়নি')),
+      );
+      return;
+    }
+    setState(() {
+      _activeMouza = 'ডিভাইস: ${picked.name}';
+      _activeSheet = picked.isPdf ? 'কাস্টম PDF' : 'কাস্টম ইমেজ';
+      _customSheetImageUrl = picked.path;
+      _showScannedSheet = true;
+      _viewMode = MouzaViewMode.cad;
+      _transformationController.value = Matrix4.identity();
+      _canvasZoom = 1.0;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${picked.name} CAD ক্যানভাসে লোড হয়েছে!'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
+    );
+  }
+
+  static String _toDmsString(double val, bool isLat) {
+    final dir = isLat ? (val >= 0 ? 'N' : 'S') : (val >= 0 ? 'E' : 'W');
+    final absVal = val.abs();
+    final deg = absVal.floor();
+    final minDec = (absVal - deg) * 60;
+    final min = minDec.floor();
+    final sec = (minDec - min) * 60;
+    return "$deg° $min' ${sec.toStringAsFixed(1)}\" $dir";
+  }
+
+  Future<void> _showGpsLocationDialog() async {
+    setState(() => _isFetchingGps = true);
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.gps_fixed, color: AppColors.primaryGreen),
-            SizedBox(width: 8),
-            Text('মৌজা জিপিএস ও ভৌগোলিক পজিশন', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF64748B), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) {
+          if (_isFetchingGps) {
+            LocationService.instance.getCurrentLocation().then((res) {
+              if (!mounted) return;
+              setState(() {
+                _lastGpsResult = res;
+                _isFetchingGps = false;
+              });
+              try {
+                setDlgState(() {});
+              } catch (_) {}
+            });
+          }
+
+          final res = _lastGpsResult;
+          final hasLoc = res != null && res.success && res.latitude != null && res.longitude != null;
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.gps_fixed, color: AppColors.primaryGreen),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text('ডিভাইস GPS ও ভৌগোলিক অবস্থান', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isFetchingGps)
+                  const Row(
+                    children: [
+                      SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('ফোনের GPS স্যাটেলাইট থেকে অবস্থান নেওয়া হচ্ছে...', style: TextStyle(fontSize: 12))),
+                    ],
+                  )
+                else if (hasLoc) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
                     child: Text(
-                      'লাইভ GNSS রিসিভার স্ট্যাটাস: সংযোগহীন (Receiver Unavailable)\nনির্ধারিত হার্ডওয়্যার সংযোগ ছাড়া রিয়েল-টাইম RTK ডাটা পাওয়া যায়নি',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                      'লাইভ ডিভাইস GPS সংযুক্ত (±${res.accuracyMeters?.toStringAsFixed(1) ?? "?"} মিটার)',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '• অক্ষাংশ (Lat): ${res.latitude!.toStringAsFixed(6)}°\n'
+                    '• দ্রাঘিমাংশ (Lng): ${res.longitude!.toStringAsFixed(6)}°\n'
+                    '• DMS: ${_toDmsString(res.latitude!, true)}, ${_toDmsString(res.longitude!, false)}',
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B), height: 1.5),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Text(
+                      res?.errorMessageBangla ?? 'GPS অবস্থান পাওয়া যায়নি। ফোনের লোকেশন চালু করে আবার চেষ্টা করুন।',
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF991B1B)),
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'নমুনা রেফারেন্স কোঅর্ডিনেট (Example Reference):',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '• নমুনা অক্ষাংশ (Lat): ২৩.৮১০৩০০° N (উদাহরণ)\n• নমুনা দ্রাঘিমাংশ (Lng): ৯০.৪১২৫০০° E (উদাহরণ)\n• DMS: ২৩° ৪৮\' ৩৭.১" N, ৯০° ২৪\' ৪৫.০" E',
-              style: TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'সার্ভেয়ার নোট: বাস্তব ফিল্ড জিপিএস ব্যবহারের জন্য "গুগল ম্যাপে দেখুন" বোতামে চাপুন।',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (c) => const GoogleMapSurveyScreen(),
+                const SizedBox(height: 10),
+                const Text(
+                  'টিপস: স্যাটেলাইট ম্যাপে সরাসরি আপনার জায়গায় পিন বসাতে নিচের "গুগল ম্যাপে খুলুন" চাপুন।',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
                 ),
-              );
-            },
-            icon: const Icon(Icons.map, size: 16),
-            label: const Text('গুগল ম্যাপে দেখুন'),
-          ),
-        ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setDlgState(() => _isFetchingGps = true);
+                },
+                child: const Text('রিফ্রেশ'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বন্ধ করুন')),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (c) => const GoogleMapSurveyScreen()),
+                  );
+                },
+                icon: const Icon(Icons.map, size: 16),
+                label: const Text('গুগল ম্যাপে খুলুন'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -405,6 +512,12 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
     }
     _loadSavedProjects();
     _recompute();
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedProjects() async {
@@ -1003,81 +1116,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   }
 
   void _acquireDeviceImageSource(String sourceName) {
-    showDialog(
-      context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(sourceName == 'ক্যামেরা' ? Icons.camera_alt : Icons.photo_library, color: AppColors.primaryGreen),
-            const SizedBox(width: 8),
-            Text('$sourceName থেকে নকশা নির্বাচন', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ডিভাইসের $sourceName থেকে মৌজা নকশা শিট বেছে নিন:',
-              style: const TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.image, color: Color(0xFF0284C7)),
-              title: const Text('ক্যাডাস্ট্রাল স্ক্যান ইমেজ ১ (নকশা ১)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('হাই-রেজোলিউশন জেপিজি ফাইল'),
-              onTap: () {
-                Navigator.pop(dlgCtx);
-                setState(() {
-                  _activeMouza = '$sourceName: মৌজা শিট ১';
-                  _activeSheet = 'শীট ১';
-                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
-                  _showScannedSheet = true;
-                  _viewMode = MouzaViewMode.cad;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$sourceName থেকে নকশা সফলভাবে লোড হয়েছে!'),
-                    backgroundColor: AppColors.primaryGreen,
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.image, color: Color(0xFF0284C7)),
-              title: const Text('ক্যাডাস্ট্রাল স্ক্যান ইমেজ ২ (নকশা ২)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('হাই-রেজোলিউশন জেপিজি ফাইল'),
-              onTap: () {
-                Navigator.pop(dlgCtx);
-                setState(() {
-                  _activeMouza = '$sourceName: মৌজা শিট ২';
-                  _activeSheet = 'শীট ২';
-                  _customSheetImageUrl = 'assets/mouza_maps/sample_mouza_sheet_2.jpg';
-                  _showScannedSheet = true;
-                  _viewMode = MouzaViewMode.cad;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$sourceName থেকে নকশা সফলভাবে লোড হয়েছে!'),
-                    backgroundColor: AppColors.primaryGreen,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dlgCtx);
-            },
-            child: const Text('বাতিল (Cancel)'),
-          ),
-        ],
-      ),
-    );
+    _pickCustomDeviceSheet();
   }
 
   // Device Sheet Picker
@@ -1094,7 +1133,27 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
           children: [
             const Text('ডিভাইস বা অফলাইন মেমোরি থেকে নকশা নির্বাচন করুন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('সরাসরি স্ক্যান করা হাই-রেজোলিউশন মৌজা শিট অথবা গ্যালারির ছবি বেছে নিন:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('সরাসরি ফোনের স্টোরেজ/গ্যালারি থেকে JPG, PNG বা PDF মৌজা শিট বেছে নিন:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 14),
+
+            // Real phone file/image/PDF picker
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _pickCustomDeviceSheet();
+                },
+                icon: const Icon(Icons.folder_open),
+                label: const Text('ফোন থেকে ফাইল / ছবি / PDF বাছাই করুন', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
             const SizedBox(height: 14),
 
             // Bundled real high-res sheets
@@ -1959,6 +2018,32 @@ $coords
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                    // Interactive Mode Toggle (Zoom/Pan vs Measure/Drag Pin)
+                  InkWell(
+                    onTap: () => setState(() => _isZoomPanMode = !_isZoomPanMode),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _isZoomPanMode ? const Color(0xFFD97706) : const Color(0xFF0284C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isZoomPanMode ? Icons.pan_tool : Icons.touch_app,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isZoomPanMode ? 'জুম/প্যান মোড' : 'মাপ/পিন মোড',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   InkWell(
                     onTap: () => setState(() => _showScannedSheet = !_showScannedSheet),
                     child: Container(
@@ -2095,85 +2180,172 @@ $coords
               ),
             ),
 
-          // Main CAD Interactive Canvas
+          // Main CAD Interactive Canvas with Synchronized Pinch-to-Zoom & Pan
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+                final transformedSceneTouch = _touchPosition != null
+                    ? MatrixUtils.transformPoint(_transformationController.value, _touchPosition!)
+                    : null;
+
                 return Stack(
                   children: [
-                    // Authentic Scanned Cadastral Sheet Layer (Positioned behind CAD canvas)
-                    Positioned.fill(
-                      child: _buildMapBackgroundLayer(),
+                    InteractiveViewer(
+                      transformationController: _transformationController,
+                      minScale: 0.8,
+                      maxScale: 8.0,
+                      boundaryMargin: const EdgeInsets.all(400),
+                      panEnabled: _isZoomPanMode,
+                      scaleEnabled: _isZoomPanMode,
+                      onInteractionEnd: (_) {
+                        setState(() {
+                          _canvasZoom = _transformationController.value.getMaxScaleOnAxis();
+                        });
+                      },
+                      child: SizedBox(
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                        child: Stack(
+                          children: [
+                            // Authentic Scanned Cadastral Sheet Layer (zooms with pins!)
+                            Positioned.fill(
+                              child: _buildMapBackgroundLayer(),
+                            ),
+
+                            // Interactive Listener for Moving Vertices in exact scene coordinates
+                            IgnorePointer(
+                              ignoring: _isZoomPanMode,
+                              child: Listener(
+                                onPointerDown: (event) {
+                                  final pos = event.localPosition;
+                                  int? tappedIdx;
+                                  final hitRadius = (28.0 / _canvasZoom).clamp(8.0, 32.0);
+                                  for (int i = 0; i < _measuredPoints.length; i++) {
+                                    if ((_measuredPoints[i] - pos).distance <= hitRadius) {
+                                      tappedIdx = i;
+                                      break;
+                                    }
+                                  }
+                                  _dragSnapshotSaved = false;
+                                  setState(() {
+                                    _touchPosition = pos;
+                                    _isTouchActive = true;
+                                    _selectedVertexIndex = tappedIdx;
+                                  });
+                                  if (tappedIdx != null) {
+                                    HapticFeedback.selectionClick();
+                                  }
+                                },
+                                onPointerMove: (event) {
+                                  final pos = event.localPosition;
+                                  if (_selectedVertexIndex != null) {
+                                    if (!_dragSnapshotSaved) {
+                                      _pushUndo();
+                                      _dragSnapshotSaved = true;
+                                    }
+
+                                    // Magnetic Ortho-Snapping when aligning horizontally/vertically
+                                    Offset adjustedPos = pos;
+                                    final currIdx = _selectedVertexIndex!;
+                                    final prevPt = _measuredPoints[(currIdx - 1 + _measuredPoints.length) % _measuredPoints.length];
+                                    final nextPt = _measuredPoints[(currIdx + 1) % _measuredPoints.length];
+                                    final snapThreshold = (8.0 / _canvasZoom).clamp(2.0, 10.0);
+
+                                    if ((pos.dx - prevPt.dx).abs() < snapThreshold) {
+                                      adjustedPos = Offset(prevPt.dx, adjustedPos.dy);
+                                    } else if ((pos.dx - nextPt.dx).abs() < snapThreshold) {
+                                      adjustedPos = Offset(nextPt.dx, adjustedPos.dy);
+                                    }
+
+                                    if ((pos.dy - prevPt.dy).abs() < snapThreshold) {
+                                      adjustedPos = Offset(adjustedPos.dx, prevPt.dy);
+                                    } else if ((pos.dy - nextPt.dy).abs() < snapThreshold) {
+                                      adjustedPos = Offset(adjustedPos.dx, nextPt.dy);
+                                    }
+
+                                    setState(() {
+                                      _measuredPoints[currIdx] = adjustedPos;
+                                      _touchPosition = adjustedPos;
+                                      _recompute();
+                                    });
+                                  } else {
+                                    setState(() => _touchPosition = pos);
+                                  }
+                                },
+                                onPointerUp: (_) {
+                                  setState(() {
+                                    _isTouchActive = false;
+                                    _touchPosition = null;
+                                    _selectedVertexIndex = null;
+                                    _dragSnapshotSaved = false;
+                                  });
+                                },
+                                onPointerCancel: (_) {
+                                  setState(() {
+                                    _isTouchActive = false;
+                                    _touchPosition = null;
+                                    _selectedVertexIndex = null;
+                                    _dragSnapshotSaved = false;
+                                  });
+                                },
+                                child: cadCanvas,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
 
-                    // Interactive Listener for Moving Vertices and Touch Magnifier Loupe
-                    Listener(
-                      onPointerDown: (event) {
-                        final pos = event.localPosition;
-                        int? tappedIdx;
-                        for (int i = 0; i < _measuredPoints.length; i++) {
-                          if ((_measuredPoints[i] - pos).distance <= 28) {
-                            tappedIdx = i;
-                            break;
-                          }
-                        }
-                        setState(() {
-                          _touchPosition = pos;
-                          _isTouchActive = true;
-                          _selectedVertexIndex = tappedIdx;
-                        });
-                        if (tappedIdx != null) {
-                          HapticFeedback.selectionClick();
-                        }
-                      },
-                      onPointerMove: (event) {
-                        final pos = event.localPosition;
-                        if (_selectedVertexIndex != null) {
-                          _pushUndo();
-
-                          // Magnetic Ortho-Snapping when aligning horizontally/vertically
-                          Offset adjustedPos = pos;
-                          final currIdx = _selectedVertexIndex!;
-                          final prevPt = _measuredPoints[(currIdx - 1 + _measuredPoints.length) % _measuredPoints.length];
-                          final nextPt = _measuredPoints[(currIdx + 1) % _measuredPoints.length];
-
-                          if ((pos.dx - prevPt.dx).abs() < 8) {
-                            adjustedPos = Offset(prevPt.dx, adjustedPos.dy);
-                          } else if ((pos.dx - nextPt.dx).abs() < 8) {
-                            adjustedPos = Offset(nextPt.dx, adjustedPos.dy);
-                          }
-
-                          if ((pos.dy - prevPt.dy).abs() < 8) {
-                            adjustedPos = Offset(adjustedPos.dx, prevPt.dy);
-                          } else if ((pos.dy - nextPt.dy).abs() < 8) {
-                            adjustedPos = Offset(adjustedPos.dx, nextPt.dy);
-                          }
-
-                          setState(() {
-                            _measuredPoints[currIdx] = adjustedPos;
-                            _touchPosition = adjustedPos;
-                            _recompute();
-                          });
-                        } else {
-                          setState(() => _touchPosition = pos);
-                        }
-                      },
-                      onPointerUp: (_) {
-                        setState(() {
-                          _isTouchActive = false;
-                          _touchPosition = null;
-                          _selectedVertexIndex = null;
-                        });
-                      },
-                      onPointerCancel: (_) {
-                        setState(() {
-                          _isTouchActive = false;
-                          _touchPosition = null;
-                          _selectedVertexIndex = null;
-                        });
-                      },
-                      child: cadCanvas,
+                    // Floating Zoom Controls (+ / - / 1x / Lock Mode)
+                    Positioned(
+                      bottom: 14,
+                      right: 12,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xCC0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF475569)),
+                            ),
+                            child: Text(
+                              '${_canvasZoom.toStringAsFixed(1)}x',
+                              style: const TextStyle(color: Colors.amberAccent, fontSize: 10.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'mouza_zoom_in',
+                            backgroundColor: const Color(0xE60F172A),
+                            foregroundColor: Colors.white,
+                            onPressed: () => _setCanvasZoom(_canvasZoom * 1.4, canvasSize),
+                            tooltip: 'মৌজা জুম ইন (+)',
+                            child: const Icon(Icons.zoom_in, size: 20),
+                          ),
+                          const SizedBox(height: 6),
+                          FloatingActionButton.small(
+                            heroTag: 'mouza_zoom_out',
+                            backgroundColor: const Color(0xE60F172A),
+                            foregroundColor: Colors.white,
+                            onPressed: () => _setCanvasZoom(_canvasZoom / 1.4, canvasSize),
+                            tooltip: 'মৌজা জুম আউট (-)',
+                            child: const Icon(Icons.zoom_out, size: 20),
+                          ),
+                          if (_canvasZoom != 1.0) ...[
+                            const SizedBox(height: 6),
+                            FloatingActionButton.small(
+                              heroTag: 'mouza_zoom_reset',
+                              backgroundColor: const Color(0xE60F5A38),
+                              foregroundColor: Colors.white,
+                              onPressed: _resetCanvasZoom,
+                              tooltip: 'স্বাভাবিক সাইজ (১x)',
+                              child: const Icon(Icons.center_focus_strong, size: 18),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
 
                     // Floating 1000-Link Digital Gunia Scale
@@ -2183,17 +2355,24 @@ $coords
                         onClose: () => setState(() => _showGuniaScale = false),
                       ),
 
-                    // Precision Touch Loupe (Zoom 2.2x offset above finger)
-                    if (_isTouchActive && _touchPosition != null)
+                    // Precision Touch Loupe (works accurately even while sheet is zoomed)
+                    if (_isTouchActive && transformedSceneTouch != null && !_isZoomPanMode)
                       TouchMagnifierLoupe(
-                        touchPosition: _touchPosition!,
+                        touchPosition: transformedSceneTouch,
                         scaleFactor: 2.2,
                         sourceSize: canvasSize,
-                        child: Stack(
-                          children: [
-                            Positioned.fill(child: _buildMapBackgroundLayer()),
-                            cadCanvas,
-                          ],
+                        child: Transform(
+                          transform: _transformationController.value,
+                          child: SizedBox(
+                            width: canvasSize.width,
+                            height: canvasSize.height,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(child: _buildMapBackgroundLayer()),
+                                cadCanvas,
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                   ],

@@ -32,13 +32,13 @@ class ToolCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isPinned
-                  ? AppColors.primaryGreen.withOpacity(0.4)
-                  : Colors.grey.shade200,
-              width: isPinned ? 1.5 : 1.0,
+                  ? AppColors.primaryGreen
+                  : const Color(0xFFCBD5E1),
+              width: isPinned ? 1.6 : 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: const Color(0xFF0F172A).withOpacity(0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),

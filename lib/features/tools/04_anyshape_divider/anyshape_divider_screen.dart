@@ -269,7 +269,30 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('টিপস: কোণগুলো ড্র্যাগ করে প্লটের আকৃতি পরিবর্তন করুন', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        TextButton.icon(
+                          onPressed: () {
+                            if (_polygon.isEmpty) return;
+                            final cx = _polygon.map((p) => p.dx).reduce((a, b) => a + b) / _polygon.length;
+                            final cy = _polygon.map((p) => p.dy).reduce((a, b) => a + b) / _polygon.length;
+                            final last = _polygon.last;
+                            final first = _polygon.first;
+                            final mid = Offset((last.dx + first.dx) / 2, (last.dy + first.dy) / 2);
+                            final out = mid - Offset(cx, cy);
+                            final norm = out.distance > 1e-6 ? out / out.distance : const Offset(1, 0);
+                            setState(() {
+                              _polygon.add(mid + norm * 25.0);
+                            });
+                          },
+                          icon: const Icon(Icons.add_circle_outline, size: 15, color: AppColors.primaryGreen),
+                          label: const Text('+ কোণ যোগ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                        ),
+                        TextButton.icon(
+                          onPressed: _polygon.length > 3
+                              ? () => setState(() => _polygon.removeLast())
+                              : null,
+                          icon: const Icon(Icons.remove_circle_outline, size: 15, color: AppColors.accentCrimson),
+                          label: const Text('− কোণ', style: TextStyle(fontSize: 11.5)),
+                        ),
                         TextButton.icon(
                           onPressed: () {
                             setState(() {
@@ -285,6 +308,13 @@ class _AnyShapeDividerScreenState extends State<AnyShapeDividerScreen> {
                           label: const Text('রিসেট', style: TextStyle(fontSize: 11)),
                         ),
                       ],
+                    ),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'টিপস: কোণ ড্র্যাগ করুন বা "+ কোণ যোগ" দিয়ে ৫-১০ কোণী জমি মাপুন',
+                        style: TextStyle(fontSize: 10.5, color: Colors.grey),
+                      ),
                     ),
                   ],
                 ),

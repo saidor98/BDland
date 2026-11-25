@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../history/models/calculation_history_item.dart';
+import '../widgets/mouza_sheet_image.dart';
 
 class ComparativePantographScreen extends StatefulWidget {
   const ComparativePantographScreen({super.key});
@@ -22,6 +24,20 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
   double _rsShiftX = 14.0; // pixels (-40 to +40)
   double _rsShiftY = 6.0;  // pixels (-30 to +30)
   double _rsScale = 1.02;  // 0.85 to 1.15
+  String? _oldSheetSource;
+  String? _newSheetSource;
+
+  Future<void> _pickSurveySheet({required bool isOld}) async {
+    final picked = await DeviceFileService.instance.pickMouzaSheet();
+    if (!mounted || picked == null) return;
+    setState(() {
+      if (isOld) {
+        _oldSheetSource = picked.path;
+      } else {
+        _newSheetSource = picked.path;
+      }
+    });
+  }
 
   static const double _baseWidthFt = 220.0;
   static const double _baseHeightFt = 150.0;
@@ -163,6 +179,18 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      // Optional Background RS/BS Mouza Sheet Image
+                      if (_newSheetSource != null)
+                        Transform.translate(
+                          offset: Offset(_rsShiftX, _rsShiftY),
+                          child: Transform.scale(
+                            scale: _rsScale,
+                            child: Opacity(
+                              opacity: 0.45,
+                              child: MouzaSheetImage(source: _newSheetSource!, fit: BoxFit.contain),
+                            ),
+                          ),
+                        ),
                       // Layer 1: New RS/BS Map (adjusted by X, Y, Scale)
                       CustomPaint(
                         painter: _MapSheetPainter(
@@ -176,13 +204,23 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
                       // Layer 2: Clipped Old CS/SA Map (base reference)
                       ClipRect(
                         clipper: _WipeClipper(_splitWipe),
-                        child: CustomPaint(
-                          painter: _MapSheetPainter(
-                            isOld: true,
-                            shiftX: 0.0,
-                            shiftY: 0.0,
-                            scale: 1.0,
-                          ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (_oldSheetSource != null)
+                              Opacity(
+                                opacity: 0.45,
+                                child: MouzaSheetImage(source: _oldSheetSource!, fit: BoxFit.contain),
+                              ),
+                            CustomPaint(
+                              painter: _MapSheetPainter(
+                                isOld: true,
+                                shiftX: 0.0,
+                                shiftY: 0.0,
+                                scale: 1.0,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -241,13 +279,28 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
                     Expanded(
                       child: Row(
                         children: [
-                          Text('ডানে-বামে: ${_rsShiftX.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+                          Text('X: ${_rsShiftX.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
                           Expanded(
                             child: Slider(
                               value: _rsShiftX,
                               min: -40,
                               max: 40,
                               onChanged: (v) => setState(() => _rsShiftX = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text('Y: ${_rsShiftY.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+                          Expanded(
+                            child: Slider(
+                              value: _rsShiftY,
+                              min: -30,
+                              max: 30,
+                              onChanged: (v) => setState(() => _rsShiftY = v),
                             ),
                           ),
                         ],
@@ -270,6 +323,26 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
                     ),
                   ],
                 ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickSurveySheet(isOld: true),
+                        icon: const Icon(Icons.folder_open, size: 15),
+                        label: Text(_oldSheetSource == null ? 'সাবেক শিট নিন' : 'সাবেক বদলান', style: const TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickSurveySheet(isOld: false),
+                        icon: const Icon(Icons.folder_open, size: 15),
+                        label: Text(_newSheetSource == null ? 'হাল শিট নিন' : 'হাল বদলান', style: const TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(

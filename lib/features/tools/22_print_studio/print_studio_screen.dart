@@ -67,10 +67,10 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text('BDLANDPRO - LAND SURVEY MEASUREMENT REPORT',
+                    pw.Text('বিডি ল্যান্ড প্রো — ভূমি পরিমাপ ও জরিপ প্রতিবেদন',
                         style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
                     pw.SizedBox(height: 4),
-                    pw.Text('Government Standard Land Cadastral & Area Certificate',
+                    pw.Text('সরকারি ক্যাডাস্ট্রাল মানদণ্ড অনুযায়ী জমি ও সীমানা প্রত্যয়নপত্র',
                         style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
                   ],
                 ),
@@ -84,17 +84,17 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Client Name:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('গ্রাহকের নাম:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(client)),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Date:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('তারিখ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(DateTime.now().toString().split(' ')[0])),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Mouza & Dag:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$mouza, Plot #$dag')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Surveyor:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('মৌজা ও দাগ:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$mouza, দাগ #$dag')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('সার্ভেয়ার:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
                       pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$surveyor ($phone)')),
                     ],
                   ),
@@ -103,7 +103,7 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
               pw.SizedBox(height: 20),
 
               // Measurement Table
-              pw.Text('Land Area Summary (Certified Measurement):', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.Text('জমির ক্ষেত্রফল সারসংক্ষেপ (প্রত্যয়িত পরিমাপ):', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
@@ -111,30 +111,30 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
                   pw.TableRow(
                     decoration: const pw.BoxDecoration(color: PdfColors.green50),
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Unit', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Area Value', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('Standard Factor', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('জমির একক', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('পরিমাপকৃত পরিমাণ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text('সরকারি হিসাব মান', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Decimal / Shotok')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('$dec Decimal', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('1 Decimal = 435.60 Sq. Ft')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('শতাংশ / শতক')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${dec.toStringAsFixed(3)} শতক', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('১ শতক = ৪৩৫.৬০ বর্গফুট')),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Katha (Govt)')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${katha.toStringAsFixed(3)} Katha')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('1 Katha = 720 Sq. Ft')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('কাঠা (সরকারি মান)')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${katha.toStringAsFixed(3)} কাঠা')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('১ কাঠা = ৭২০ বর্গফুট')),
                     ],
                   ),
                   pw.TableRow(
                     children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Square Feet (Sq. Ft)')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${sqFt.toStringAsFixed(1)} ft²')),
-                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Direct Cadastral Area')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('বর্গফুট (Sq. Ft)')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('${sqFt.toStringAsFixed(1)} বর্গফুট')),
+                      pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('সরাসরি ক্যাডাস্ট্রাল ক্ষেত্রফল')),
                     ],
                   ),
                 ],
@@ -142,7 +142,7 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
               pw.SizedBox(height: 20),
 
               // Surveyor Comments
-              pw.Text('Surveyor Field Notes & Chouhoddi:', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              pw.Text('সার্ভেয়ারের মাঠ পর্যায়ের নোট ও চৌহদ্দি:', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 4),
               pw.Container(
                 width: double.infinity,
@@ -165,7 +165,7 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
                     children: [
                       pw.Container(width: 140, height: 1, color: PdfColors.grey700),
                       pw.SizedBox(height: 4),
-                      pw.Text('Client / Land Owner Signature', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('জমির মালিক / গ্রাহকের স্বাক্ষর', style: const pw.TextStyle(fontSize: 10)),
                     ],
                   ),
                   pw.Column(
@@ -173,7 +173,7 @@ class _PrintStudioScreenState extends State<PrintStudioScreen> {
                     children: [
                       pw.Container(width: 140, height: 1, color: PdfColors.grey700),
                       pw.SizedBox(height: 4),
-                      pw.Text('Licensed Surveyor Signature & Seal', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('সার্ভেয়ার / আমিনের স্বাক্ষর ও সিল', style: const pw.TextStyle(fontSize: 10)),
                     ],
                   ),
                 ],

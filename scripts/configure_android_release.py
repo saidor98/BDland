@@ -30,6 +30,7 @@ def main():
             "    <uses-permission android:name=\"android.permission.INTERNET\"/>\n"
             "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>\n"
             "    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>\n"
+            "    <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\"/>\n"
         )
         if "<uses-permission" not in content:
             content = content.replace("<application", permissions + "    <application", 1)

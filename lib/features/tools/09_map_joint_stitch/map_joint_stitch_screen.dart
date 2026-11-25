@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/pdf_report_helper.dart';
@@ -30,16 +31,30 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
   String? _sheetAAsset;
   String? _sheetBAsset;
   bool _isExporting = false;
-
-  static const List<Map<String, String?>> _sheetChoices = [
+  final List<Map<String, String?>> _dynamicChoices = [
     {'label': 'ভেক্টর শিট', 'asset': null},
     {'label': 'নমুনা শিট ১', 'asset': 'assets/mouza_maps/sample_mouza_sheet_1.jpg'},
     {'label': 'নমুনা শিট ২', 'asset': 'assets/mouza_maps/sample_mouza_sheet_2.jpg'},
     {'label': 'তেজকুনিপাড়া শিট', 'asset': 'assets/mouza_maps/SA_Tejgaon_Tejkunipara_Sheet1.pdf'},
   ];
 
+  Future<void> _pickJointSheet(bool isLeft) async {
+    final picked = await DeviceFileService.instance.pickMouzaSheet();
+    if (!mounted || picked == null) return;
+    setState(() {
+      if (!_dynamicChoices.any((c) => c['asset'] == picked.path)) {
+        _dynamicChoices.add({'label': picked.name, 'asset': picked.path});
+      }
+      if (isLeft) {
+        _sheetAAsset = picked.path;
+      } else {
+        _sheetBAsset = picked.path;
+      }
+    });
+  }
+
   String _labelFor(String? asset, String fallback) {
-    final match = _sheetChoices.where((e) => e['asset'] == asset).toList();
+    final match = _dynamicChoices.where((e) => e['asset'] == asset).toList();
     return match.isNotEmpty ? match.first['label']! : fallback;
   }
 
@@ -143,14 +158,21 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
                     isExpanded: true,
                     isDense: true,
                     underline: const SizedBox.shrink(),
-                    items: _sheetChoices
+                    items: _dynamicChoices
                         .map((c) => DropdownMenuItem<String?>(
                               value: c['asset'],
-                              child: Text('বাম: ${c['label']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: Text('বাম: ${c['label']}', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _sheetAAsset = v),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.folder_open, size: 18, color: AppColors.primaryGreen),
+                  tooltip: 'ফোন থেকে বাম শিট',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _pickJointSheet(true),
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6),
@@ -162,14 +184,21 @@ class _MapJointStitchScreenState extends State<MapJointStitchScreen> {
                     isExpanded: true,
                     isDense: true,
                     underline: const SizedBox.shrink(),
-                    items: _sheetChoices
+                    items: _dynamicChoices
                         .map((c) => DropdownMenuItem<String?>(
                               value: c['asset'],
-                              child: Text('ডান: ${c['label']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: Text('ডান: ${c['label']}', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _sheetBAsset = v),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.folder_open, size: 18, color: AppColors.primaryGreen),
+                  tooltip: 'ফোন থেকে ডান শিট',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _pickJointSheet(false),
                 ),
               ],
             ),

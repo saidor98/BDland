@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -8,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/device_file_service.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/pdf_report_helper.dart';
@@ -142,8 +142,18 @@ class _MapConverterScreenState extends State<MapConverterScreen> {
       }
 
       if (_targetFormat == 'PNG' && pngBytes != null) {
-        await Printing.sharePdf(bytes: pngBytes, filename: 'BDLandPro_Mouza_${_dpi}DPI.png');
-        await _saveExportHistory('High-Res PNG ($_scale, $_dpi DPI)', 'PNG ${pngBytes.length} bytes');
+        // Wrap high-res PNG bytes in an exact-aspect clean PDF page so OS Print/Share handles it reliably
+        final imgPdf = pw.Document();
+        imgPdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: pw.EdgeInsets.zero,
+            build: (ctx) => pw.Center(child: pw.Image(pw.MemoryImage(pngBytes!), fit: pw.BoxFit.contain)),
+          ),
+        );
+        final outPdf = await imgPdf.save();
+        await Printing.sharePdf(bytes: outPdf, filename: 'BDLandPro_Clean_Mouza_${_dpi}DPI.pdf');
+        await _saveExportHistory('Clean High-Res Image PDF ($_scale, $_dpi DPI)', 'Raster ${pngBytes.length} bytes');
         return;
       }
 
@@ -249,24 +259,38 @@ EOF
       ),
       body: Column(
         children: [
-          // Sheet selector pills
+          // Sheet selector pills + Device Picker
           SizedBox(
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              children: _sheetOptions.map((opt) {
-                final isSel = _selectedSheetAsset == opt['asset'];
-                return Padding(
+              children: [
+                Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
-                    selected: isSel,
-                    selectedColor: AppColors.primaryGreen,
-                    onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                  child: ActionChip(
+                    avatar: const Icon(Icons.folder_open, size: 15),
+                    label: const Text('ফোন থেকে ফাইল', style: TextStyle(fontSize: 11.5)),
+                    onPressed: () async {
+                      final picked = await DeviceFileService.instance.pickMouzaSheet();
+                      if (!mounted || picked == null) return;
+                      setState(() => _selectedSheetAsset = picked.path);
+                    },
                   ),
-                );
-              }).toList(),
+                ),
+                ..._sheetOptions.map((opt) {
+                  final isSel = _selectedSheetAsset == opt['asset'];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
+                      selected: isSel,
+                      selectedColor: AppColors.primaryGreen,
+                      onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
 

@@ -8,6 +8,8 @@ import '../widgets/sidebar_drawer.dart';
 import '../widgets/tool_card.dart';
 import '../widgets/review_section.dart';
 import '../widgets/user_guide_view.dart';
+import '../../tools/01_google_map_survey/google_map_survey_screen.dart';
+import '../../tools/02_mouza_simple/mouza_map_simple_screen.dart';
 import '../../tools/24_surveyor_memo/surveyor_memo_screen.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
@@ -444,6 +446,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_topTabIndex == 0 && _searchQuery.trim().isEmpty) ...[
+            _buildStitchHeroDeck(width >= 650),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.engineering, size: 17, color: AppColors.primaryGreen),
+                SizedBox(width: 6),
+                Text(
+                  'সকল ২৪টি প্রফেশনাল জরিপ টুলস',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -473,6 +490,139 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  Widget _buildStitchHeroDeck(bool isWide) {
+    final gpsHeroCard = InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GoogleMapSurveyScreen()),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: AppColors.greenHeaderGradient,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.secondaryGold, width: 1.3),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGreen.withOpacity(0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0x33FFFFFF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF38BDF8)),
+              ),
+              child: const Icon(Icons.my_location, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'লাইভ GPS স্যাটেলাইট জরিপ',
+                    style: TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'নিজের বর্তমান অবস্থান অনুযায়ী ম্যাপ ও বাউন্ডারি মাপ',
+                    style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: Color(0xFFFBBF24), size: 15),
+          ],
+        ),
+      ),
+    );
+
+    final mouzaHeroCard = InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MouzaMapSimpleScreen()),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primaryGreen.withOpacity(0.45), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.secondaryGold),
+              ),
+              child: const Icon(Icons.architecture, color: AppColors.secondaryGoldDark, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'মৌজা ম্যাপ জুম ও CAD পরিমাপ',
+                    style: TextStyle(color: Color(0xFF0F172A), fontSize: 14.5, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    '১৬"/৩২"/৬৪" স্কেল · ৮x জুম · ফোন থেকে ফাইল/PDF লোড',
+                    style: TextStyle(color: Color(0xFF475569), fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: AppColors.primaryGreen, size: 15),
+          ],
+        ),
+      ),
+    );
+
+    if (isWide) {
+      return Row(
+        children: [
+          Expanded(child: gpsHeroCard),
+          const SizedBox(width: 12),
+          Expanded(child: mouzaHeroCard),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        gpsHeroCard,
+        const SizedBox(height: 10),
+        mouzaHeroCard,
+      ],
     );
   }
 }
