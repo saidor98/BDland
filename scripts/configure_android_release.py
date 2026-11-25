@@ -103,5 +103,58 @@ def main():
             f.write(content)
         print("Patched build.gradle.kts (Kotlin DSL) successfully.")
 
+    # 5. Enforce compileSdk >= 36 on Android library subprojects (e.g. plugins pinned to SDK 34)
+    root_kts = os.path.join("android", "build.gradle.kts")
+    if os.path.exists(root_kts):
+        with open(root_kts, 'r', encoding='utf-8') as f:
+            rk_content = f.read()
+        if "LibraryExtension" not in rk_content:
+            sdk_guard = (
+                "subprojects {\n"
+                "    afterEvaluate {\n"
+                "        if (plugins.hasPlugin(\"com.android.library\")) {\n"
+                "            extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)?.apply {\n"
+                "                if ((compileSdk ?: 0) < 36) {\n"
+                "                    compileSdk = 36\n"
+                "                }\n"
+                "            }\n"
+                "        }\n"
+                "    }\n"
+                "}\n\n"
+            )
+            anchor = "subprojects {\n    project.evaluationDependsOn(\":app\")"
+            if anchor in rk_content:
+                rk_content = rk_content.replace(anchor, sdk_guard + anchor, 1)
+            else:
+                rk_content += "\n" + sdk_guard
+            with open(root_kts, 'w', encoding='utf-8') as f:
+                f.write(rk_content)
+            print("Patched android/build.gradle.kts to enforce compileSdk >= 36 on library subprojects.")
+
+    root_groovy = os.path.join("android", "build.gradle")
+    if os.path.exists(root_groovy):
+        with open(root_groovy, 'r', encoding='utf-8') as f:
+            rg_content = f.read()
+        if "compileSdkVersion 36" not in rg_content:
+            sdk_guard_groovy = (
+                "subprojects {\n"
+                "    afterEvaluate { project ->\n"
+                "        if (project.plugins.hasPlugin('com.android.library') && project.hasProperty('android')) {\n"
+                "            project.android {\n"
+                "                compileSdkVersion 36\n"
+                "            }\n"
+                "        }\n"
+                "    }\n"
+                "}\n\n"
+            )
+            anchor_g = "subprojects {\n    project.evaluationDependsOn(':app')"
+            if anchor_g in rg_content:
+                rg_content = rg_content.replace(anchor_g, sdk_guard_groovy + anchor_g, 1)
+            else:
+                rg_content += "\n" + sdk_guard_groovy
+            with open(root_groovy, 'w', encoding='utf-8') as f:
+                f.write(rg_content)
+            print("Patched android/build.gradle to enforce compileSdk >= 36 on library subprojects.")
+
 if __name__ == "__main__":
     main()
