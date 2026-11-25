@@ -100,8 +100,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Default: 100.0 decimal, 2 sons, 1 widow -> 2 parts (66.667) + 1 part (33.333)
-      expect(find.textContaining('পুত্র / ছেলে'), findsOneWidget);
-      expect(find.textContaining('বিধবা স্ত্রী (১ জন)'), findsOneWidget);
+      expect(find.text('পুত্র / ছেলে (২ জন)'), findsOneWidget);
+      expect(find.text('বিধবা স্ত্রী (১ জন)'), findsOneWidget);
+      expect(find.text('৬৬.৬৬৭ শতক'), findsOneWidget);
+      expect(find.text('৩৩.৩৩৩ শতক'), findsOneWidget);
       expect(find.textContaining('১৯৩৭ সালের আইন'), findsOneWidget);
     });
   });

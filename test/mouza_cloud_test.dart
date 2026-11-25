@@ -112,7 +112,12 @@ void main() {
       expect(restored.downloadUrl, equals(pdfItem.downloadUrl));
       expect(restored.isPdf, isTrue);
 
-      final jpgItem = MouzaCloudItem(name: 'sheet_102.JPG', isFolder: false, path: 'Dhaka');
+      final jpgItem = MouzaCloudItem(
+        name: 'sheet_102.JPG',
+        isFolder: false,
+        path: 'Dhaka',
+        driveIndex: 0,
+      );
       expect(jpgItem.isImage, isTrue);
       expect(jpgItem.isPdf, isFalse);
     });
