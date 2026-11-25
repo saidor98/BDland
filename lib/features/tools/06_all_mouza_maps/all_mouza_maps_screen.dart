@@ -349,9 +349,9 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF131B2E),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6B21A8),
+        backgroundColor: const Color(0xFF004126),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -387,7 +387,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
         children: [
           // 1. TOP TABS: সকল ম্যাপ | প্রিয় ম্যাপ | সেভ ম্যাপ
           Container(
-            color: const Color(0xFF6B21A8),
+            color: const Color(0xFF004126),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
@@ -402,7 +402,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
 
           // 2. SOURCE PILLS: ক্লাউড | অফলাইন বান্ডেল্ড | প্রিয়/সেভড
           Container(
-            color: const Color(0xFF1E1B4B),
+            color: const Color(0xFF0F5A38),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
@@ -775,7 +775,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                                   height: 40,
                                   decoration: BoxDecoration(
                                     color: item.isFolder
-                                        ? const Color(0x4D6B21A8)
+                                        ? const Color(0x33FFC64D)
                                         : (isPdf ? const Color(0x33DC2626) : const Color(0x330284C7)),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -784,7 +784,7 @@ class _AllMouzaMapsScreenState extends State<AllMouzaMapsScreen> {
                                         ? Icons.folder
                                         : (isPdf ? Icons.picture_as_pdf : Icons.image),
                                     color: item.isFolder
-                                        ? const Color(0xFFA855F7)
+                                        ? const Color(0xFFFFC64D)
                                         : (isPdf ? const Color(0xFFEF4444) : const Color(0xFF38BDF8)),
                                     size: 22,
                                   ),

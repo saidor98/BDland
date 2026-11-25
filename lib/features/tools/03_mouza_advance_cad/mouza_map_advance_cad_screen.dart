@@ -49,9 +49,23 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
   final TransformationController _transformationController = TransformationController();
   bool _isZoomPanMode = false;
   double _canvasZoom = 1.0;
+  Size _lastCanvasSize = const Size(360, 480);
   String? _sheetSource;
   bool _showSheet = true;
   double _sheetOpacity = 0.80;
+
+  void _addVertexAtViewportCenter() {
+    _pushUndo();
+    final centerPt = Offset(_lastCanvasSize.width / 2.0, _lastCanvasSize.height / 2.0);
+    final scenePt = _transformationController.toScene(centerPt);
+    final pos = scenePt.dx.isFinite && scenePt.dy.isFinite ? scenePt : const Offset(180, 180);
+    setState(() {
+      _vertices.add(pos);
+      _splitStart = null;
+      _splitEnd = null;
+    });
+    HapticFeedback.selectionClick();
+  }
 
   @override
   void dispose() {
@@ -197,6 +211,7 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
         splitStart: _splitStart,
         splitEnd: _splitEnd,
         transparentBg: _sheetSource != null && _showSheet,
+        canvasZoom: _canvasZoom,
       ),
       size: Size.infinite,
     );
@@ -307,6 +322,7 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+                _lastCanvasSize = canvasSize;
                 final loupeTouch = _touchPosition != null
                     ? MatrixUtils.transformPoint(_transformationController.value, _touchPosition!)
                     : null;
@@ -327,6 +343,10 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
                       boundaryMargin: const EdgeInsets.all(400),
                       panEnabled: _isZoomPanMode,
                       scaleEnabled: _isZoomPanMode,
+                      onInteractionUpdate: (_) {
+                        final s = _transformationController.value.getMaxScaleOnAxis();
+                        if ((s - _canvasZoom).abs() > 0.02) setState(() => _canvasZoom = s);
+                      },
                       onInteractionEnd: (_) {
                         setState(() => _canvasZoom = _transformationController.value.getMaxScaleOnAxis());
                       },
@@ -504,7 +524,13 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
                     foregroundColor: _isSplitMode ? AppColors.accentCrimson : AppColors.primaryGreen,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  onPressed: _addVertexAtViewportCenter,
+                  icon: const Icon(Icons.add_location_alt_outlined, color: AppColors.primaryGreen),
+                  tooltip: 'বর্তমান জুম কেন্দ্রে পিন যোগ',
+                ),
+                const SizedBox(width: 6),
                 IconButton.filledTonal(
                   onPressed: (_undoStack.isNotEmpty || _vertices.isNotEmpty) ? _undo : null,
                   icon: const Icon(Icons.undo),
@@ -664,15 +690,16 @@ class _MouzaMapAdvanceCadScreenState extends State<MouzaMapAdvanceCadScreen> {
 
   Offset _snapPos(Offset pos) {
     if (_snapToVertex) {
+      final snapR = (16.0 / _canvasZoom).clamp(2.0, 18.0);
       for (int i = 0; i < _vertices.length; i++) {
         if (i == _selectedVertexIndex) continue;
-        if ((_vertices[i] - pos).distance < 16.0) {
+        if ((_vertices[i] - pos).distance < snapR) {
           return _vertices[i];
         }
       }
     }
 
-    if (_snapToGrid) {
+    if (_snapToGrid && _canvasZoom < 2.2) {
       final sx = (pos.dx / _gridSpacing).round() * _gridSpacing;
       final sy = (pos.dy / _gridSpacing).round() * _gridSpacing;
       return Offset(sx, sy);
@@ -745,6 +772,7 @@ class _CadCanvasPainter extends CustomPainter {
   final Offset? splitStart;
   final Offset? splitEnd;
   final bool transparentBg;
+  final double canvasZoom;
 
   _CadCanvasPainter({
     required this.vertices,
@@ -754,18 +782,21 @@ class _CadCanvasPainter extends CustomPainter {
     this.splitStart,
     this.splitEnd,
     this.transparentBg = false,
+    this.canvasZoom = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    final inv = 1.0 / canvasZoom.clamp(0.8, 8.0);
+
     if (!transparentBg) {
       canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF0F172A));
     }
 
-    final dotPaint = Paint()..color = const Color(0xFF334155)..strokeWidth = 1.0;
+    final dotPaint = Paint()..color = const Color(0xFF334155)..strokeWidth = 1.0 * inv;
     for (double x = 0; x < size.width; x += gridSpacing) {
       for (double y = 0; y < size.height; y += gridSpacing) {
-        canvas.drawCircle(Offset(x, y), 0.8, dotPaint);
+        canvas.drawCircle(Offset(x, y), 0.8 * inv, dotPaint);
       }
     }
 
@@ -778,26 +809,31 @@ class _CadCanvasPainter extends CustomPainter {
     }
     if (vertices.length >= 3) {
       polyPath.close();
-      canvas.drawPath(polyPath, Paint()..color = Colors.cyan.withOpacity(0.15)..style = PaintingStyle.fill);
+      canvas.drawPath(polyPath, Paint()..color = Colors.cyan.withValues(alpha: 0.15)..style = PaintingStyle.fill);
     }
 
     final linePaint = Paint()
       ..color = Colors.cyanAccent
-      ..strokeWidth = 2.0
+      ..strokeWidth = 2.0 * inv
       ..style = PaintingStyle.stroke;
     canvas.drawPath(polyPath, linePaint);
 
+    final pinBorder = Paint()..color = Colors.cyanAccent..strokeWidth = 1.5 * inv..style = PaintingStyle.stroke;
+    final crossPaint = Paint()..color = AppColors.primaryGreen..strokeWidth = 1.2 * inv;
+
     for (int i = 0; i < vertices.length; i++) {
       final p1 = vertices[i];
-      canvas.drawCircle(p1, 5, Paint()..color = Colors.white);
-      canvas.drawCircle(p1, 5, Paint()..color = Colors.cyanAccent..strokeWidth = 1.5..style = PaintingStyle.stroke);
+      canvas.drawCircle(p1, 5.0 * inv, Paint()..color = Colors.white);
+      canvas.drawCircle(p1, 5.0 * inv, pinBorder);
+      canvas.drawLine(p1 + Offset(-6.5 * inv, 0), p1 + Offset(6.5 * inv, 0), crossPaint);
+      canvas.drawLine(p1 + Offset(0, -6.5 * inv), p1 + Offset(0, 6.5 * inv), crossPaint);
 
       if (vertices.length > 1) {
         final p2 = vertices[(i + 1) % vertices.length];
         if (i < vertices.length - 1 || vertices.length >= 3) {
           final dist = (p2 - p1).distance * feetPerPixel;
           final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-          _drawText(canvas, '${BanglaNumerals.toBangla(dist.toStringAsFixed(1))}\'', mid, Colors.yellowAccent);
+          _drawText(canvas, '${BanglaNumerals.toBangla(dist.toStringAsFixed(1))}\'', mid, Colors.yellowAccent, inv);
         }
       }
 
@@ -805,29 +841,29 @@ class _CadCanvasPainter extends CustomPainter {
         final prev = vertices[(i - 1 + vertices.length) % vertices.length];
         final next = vertices[(i + 1) % vertices.length];
         final angle = PolygonGeometry.calculateInteriorAngleDegrees(prev, p1, next);
-        _drawText(canvas, '${BanglaNumerals.toBangla(angle.toStringAsFixed(0))}°', Offset(p1.dx + 12, p1.dy - 12), Colors.greenAccent);
+        _drawText(canvas, '${BanglaNumerals.toBangla(angle.toStringAsFixed(0))}°', Offset(p1.dx + 12 * inv, p1.dy - 12 * inv), Colors.greenAccent, inv);
       }
     }
 
     if (splitStart != null && splitEnd != null) {
       final splitPaint = Paint()
         ..color = AppColors.accentCrimson
-        ..strokeWidth = 2.5
+        ..strokeWidth = 2.5 * inv
         ..style = PaintingStyle.stroke;
       canvas.drawLine(splitStart!, splitEnd!, splitPaint);
-      _drawText(canvas, 'বিভাজন রেখা', Offset((splitStart!.dx + splitEnd!.dx) / 2, (splitStart!.dy + splitEnd!.dy) / 2 - 12), Colors.redAccent);
+      _drawText(canvas, 'বিভাজন রেখা', Offset((splitStart!.dx + splitEnd!.dx) / 2, (splitStart!.dy + splitEnd!.dy) / 2 - 12 * inv), Colors.redAccent, inv);
     }
   }
 
-  void _drawText(Canvas canvas, String text, Offset offset, Color color) {
+  void _drawText(Canvas canvas, String text, Offset offset, Color color, double inv) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10.5 * inv,
           fontWeight: FontWeight.bold,
-          backgroundColor: Colors.black.withOpacity(0.6),
+          backgroundColor: Colors.black.withValues(alpha: 0.7),
           fontFamily: 'Hind Siliguri',
         ),
       ),

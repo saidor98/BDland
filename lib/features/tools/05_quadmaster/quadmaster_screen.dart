@@ -293,13 +293,14 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
     final areaDec = r?.exactAreaDecimal ?? 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.primaryGreen,
+        foregroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Column(
@@ -307,32 +308,32 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
           children: [
             Text(
               'চতুর্ভুজ পরিমাপ ও বণ্টন',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
-              'QuadMaster Pro',
-              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              'QuadMaster Pro • হিরন ও গড় পদ্ধতি',
+              style: TextStyle(fontSize: 10.5, color: Color(0xFFFFDEA3)),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.undo, color: Color(0xFF334155), size: 20),
+            icon: const Icon(Icons.undo, color: Colors.white, size: 20),
             tooltip: 'পূর্বাবস্থা (Undo)',
             onPressed: _undo,
           ),
           IconButton(
-            icon: const Icon(Icons.redo, color: Color(0xFF334155), size: 20),
+            icon: const Icon(Icons.redo, color: Colors.white, size: 20),
             tooltip: 'পুনরাবৃত্তি (Redo)',
             onPressed: _redo,
           ),
           IconButton(
-            icon: const Icon(Icons.play_circle_fill, color: Colors.red, size: 22),
+            icon: const Icon(Icons.play_circle_fill, color: Color(0xFFFFC64D), size: 22),
             tooltip: 'প্রশিক্ষণ ও নিয়মাবলি',
             onPressed: _showTutorialGuideDialog,
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF334155)),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (val) {
               if (val == 'copy') _copyReport();
               if (val == 'save') _saveToHistory();
@@ -375,10 +376,10 @@ class _QuadMasterScreenState extends State<QuadMasterScreen> {
                 MaterialPageRoute(builder: (_) => const PolygonScreen()),
               );
             },
-            icon: const Icon(Icons.straighten, size: 16, color: Color(0xFF2563EB)),
-            label: const Text('আরও ৪+ বাহু / বহুভুজ মাপুন', style: TextStyle(color: Color(0xFF2563EB), fontSize: 13)),
+            icon: const Icon(Icons.straighten, size: 16, color: AppColors.primaryGreen),
+            label: const Text('আরও ৪+ বাহু / বহুভুজ মাপুন', style: TextStyle(color: AppColors.primaryGreen, fontSize: 13, fontWeight: FontWeight.w600)),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFBFDBFE)),
+              side: const BorderSide(color: AppColors.primaryGreen),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),

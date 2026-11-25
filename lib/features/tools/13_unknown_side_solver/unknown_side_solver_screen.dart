@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class UnknownSideSolverScreen extends StatefulWidget {
   const UnknownSideSolverScreen({super.key});
@@ -17,11 +19,20 @@ class _UnknownSideSolverScreenState extends State<UnknownSideSolverScreen> {
   final _secondKnownCtrl = TextEditingController(text: '60.0'); // For trapezoid
 
   double _requiredLengthFt = 0.0;
+  bool _isImpossibleGeometry = false;
 
   @override
   void initState() {
     super.initState();
     _solve();
+  }
+
+  @override
+  void dispose() {
+    _targetAreaDecCtrl.dispose();
+    _knownSideCtrl.dispose();
+    _secondKnownCtrl.dispose();
+    super.dispose();
   }
 
   void _solve() {
@@ -32,18 +43,51 @@ class _UnknownSideSolverScreenState extends State<UnknownSideSolverScreen> {
 
     double result = 0;
     if (_mode == 'আয়তক্ষেত্রাকার জমি') {
-      if (side1 > 0) result = targetSqFt / side1;
+      if (side1 > 0 && targetSqFt > 0) result = targetSqFt / side1;
     } else if (_mode == 'ট্রাপিজিয়াম (গড় বিস্তার)') {
       // Area = ((a + b) / 2) * h -> b = (2 * Area / h) - a
-      if (side2 > 0) {
+      if (side2 > 0 && targetSqFt > 0) {
         result = ((2 * targetSqFt) / side2) - side1;
       }
     } else if (_mode == 'ত্রিভুজাকার জমি') {
       // Area = 0.5 * base * height -> height = (2 * Area) / base
-      if (side1 > 0) result = (2 * targetSqFt) / side1;
+      if (side1 > 0 && targetSqFt > 0) result = (2 * targetSqFt) / side1;
     }
 
-    setState(() => _requiredLengthFt = result > 0 ? result : 0);
+    setState(() {
+      _isImpossibleGeometry = targetSqFt > 0 && result <= 0;
+      _requiredLengthFt = result > 0 ? result : 0;
+    });
+  }
+
+  String _buildReport(double targetDec, double targetSqFt, double links, double hath) {
+    return '''
+=== অজানা বাহু পরিমাপ রিপোর্ট ===
+তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}
+পদ্ধতি: $_mode
+কাঙ্ক্ষিত জমি: ${BanglaFormatter.formatNumber(targetDec)} শতক (${BanglaFormatter.formatNumber(targetSqFt)} বর্গফুট)
+প্রদত্ত জ্ঞাত বাহু: ${_knownSideCtrl.text} ফুট
+প্রয়োজনীয় অজানা বাহুর দৈর্ঘ্য: ${BanglaFormatter.formatNumber(_requiredLengthFt)} ফুট (${BanglaFormatter.formatNumber(links)} লিংক বা ${BanglaFormatter.formatNumber(hath)} হাত)
+অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ
+''';
+  }
+
+  Future<void> _saveToHistory(double targetDec, double targetSqFt, double links, double hath) async {
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'unknown_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'অজানা বাহু নির্ণয় (${BanglaFormatter.formatNumber(targetDec)} শতক)',
+        category: 'জ্যামিতি',
+        timestamp: DateTime.now(),
+        inputSummary: '$_mode | জ্ঞাত: ${_knownSideCtrl.text} ফুট',
+        resultSummary: '${BanglaFormatter.formatNumber(_requiredLengthFt)} ফুট (${BanglaFormatter.formatNumber(links)} লিংক)',
+        fullReportBangla: _buildReport(targetDec, targetSqFt, links, hath),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('অজানা বাহুর হিসাব হিস্ট্রিতে সংরক্ষিত হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+    );
   }
 
   @override
@@ -58,18 +102,15 @@ class _UnknownSideSolverScreenState extends State<UnknownSideSolverScreen> {
         title: const Text('ক্ষেত্রফল / অজানা বাহু নির্ণয়'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'হিস্ট্রিতে সেভ',
+            onPressed: _requiredLengthFt > 0 ? () => _saveToHistory(targetDec, targetSqFt, links, hath) : null,
+          ),
+          IconButton(
             icon: const Icon(Icons.copy),
             tooltip: 'কপি',
             onPressed: () {
-              final report = '''
-=== অজানা বাহু পরিমাপ রিপোর্ট ===
-তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}
-পদ্ধতি: $_mode
-কাঙ্ক্ষিত জমি: ${BanglaFormatter.formatNumber(targetDec)} শতক (${BanglaFormatter.formatNumber(targetSqFt)} বর্গফুট)
-প্রদত্ত জ্ঞাত বাহু: ${_knownSideCtrl.text} ফুট
-প্রয়োজনীয় অজানা বাহুর দৈর্ঘ্য: ${BanglaFormatter.formatNumber(_requiredLengthFt)} ফুট (${BanglaFormatter.formatNumber(links)} লিংক বা ${BanglaFormatter.formatNumber(hath)} হাত)
-অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ
-''';
+              final report = _buildReport(targetDec, targetSqFt, links, hath);
               Clipboard.setData(ClipboardData(text: report));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('অজানা বাহুর হিসাব কপি করা হয়েছে!')),
@@ -82,7 +123,28 @@ class _UnknownSideSolverScreenState extends State<UnknownSideSolverScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Target Result Highlight Card
+            if (_isImpossibleGeometry)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFDAD6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: AppColors.accentCrimson, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'অসম্ভব জ্যামিতি: প্রদত্ত ১ম বাহু ও উচ্চতা দিয়ে এই ক্ষেত্রফল পাওয়া সম্ভব নয় (২য় বাহু ঋণাত্মক আসছে)।',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF93000A)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Target Result Highlight Card (Stitch Emerald Precision Card)
             Card(
               color: AppColors.primaryGreenLight,
               child: Padding(

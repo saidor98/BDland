@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bdland_pro/features/tools/02_mouza_simple/mouza_map_simple_screen.dart';
 import 'package:bdland_pro/features/tools/04_anyshape_divider/anyshape_divider_screen.dart';
 import 'package:bdland_pro/features/tools/05_quadmaster/quadmaster_screen.dart';
+import 'package:bdland_pro/features/tools/13_unknown_side_solver/unknown_side_solver_screen.dart';
 import 'package:bdland_pro/features/tools/19_hindu_inheritance/hindu_inheritance_screen.dart';
 import 'package:bdland_pro/features/tools/20_hissya_calculator/hissya_calculator_screen.dart';
+import 'package:bdland_pro/features/tools/23_survey_formulas/land_survey_formulas_screen.dart';
 import 'package:bdland_pro/features/tools/widgets/touch_magnifier_loupe.dart';
 
 void main() {
@@ -224,6 +226,33 @@ void main() {
 
       expect(find.byType(InteractiveViewer), findsOneWidget);
       expect(find.text('অটো-ডিভিশন / বণ্টন'), findsOneWidget);
+    });
+  });
+
+  group('Tool 13 UnknownSide & Tool 23 Formulas Tests', () {
+    testWidgets('UnknownSideSolver detects impossible trapezoid geometry', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: UnknownSideSolverScreen()));
+      await tester.pumpAndSettle();
+
+      // Switch to Trapezoid mode where default 5 dec = 2178 sq ft, a = 80, h = 60 -> b = (4356/60)-80 = -7.4 <= 0
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ট্রাপিজিয়াম (১ম বাহু ও উচ্চতা দেওয়া, ২য় বাহু নির্ণয়)').last);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('অসম্ভব জ্যামিতি'), findsOneWidget);
+    });
+
+    testWidgets('LandSurveyFormulas filters sections by search query', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: LandSurveyFormulasScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('গান্টার্স চেইন'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'নামজারি');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('নামজারি (Mutation)'), findsOneWidget);
+      expect(find.textContaining('গান্টার্স চেইন'), findsNothing);
     });
   });
 }

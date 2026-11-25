@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
 import '../../khatian/models/ana_gonda_share.dart';
 import '../widgets/ana_gonda_keypad.dart';
 
@@ -31,6 +33,48 @@ class _AnaGondaConverterScreenState extends State<AnaGondaConverterScreen> {
     _recomputeReverse();
   }
 
+  @override
+  void dispose() {
+    _anaCtrl.dispose();
+    _gondaCtrl.dispose();
+    _koraCtrl.dispose();
+    _krantiCtrl.dispose();
+    _tilCtrl.dispose();
+    _totalLandCtrl.dispose();
+    _reverseDecimalCtrl.dispose();
+    super.dispose();
+  }
+
+  String _buildReport(AnaGondaShare s, double totalLand, double allocatedDec) {
+    return '''
+=== আনা-গণ্ডা হিস্যা রূপান্তর রিপোর্ট ===
+তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())}
+হিস্যা: ${s.toBanglaText()} (${s.toSymbolRepresentation()})
+দশমিক অংশ: ${s.toFraction().toStringAsFixed(6)} (${BanglaFormatter.formatPercentage(s.toPercentage())})
+মোট জমি: ${BanglaFormatter.formatNumber(totalLand)} শতক
+প্রাপ্ত জমি: ${BanglaFormatter.formatNumber(allocatedDec, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(allocatedDec * 435.60)} sq ft)
+অ্যাপ: BDLandPro - বাংলাদেশ ভূমি জরিপ
+''';
+  }
+
+  Future<void> _saveToHistory(AnaGondaShare s, double totalLand, double allocatedDec) async {
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'ana_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'আনা-গণ্ডা: ${s.toBanglaText()}',
+        category: 'খতিয়ান',
+        timestamp: DateTime.now(),
+        inputSummary: 'মোট জমি: ${BanglaFormatter.formatNumber(totalLand)} শতক',
+        resultSummary: '${BanglaFormatter.formatNumber(allocatedDec, fractionDigits: 3)} শতক (${BanglaFormatter.formatPercentage(s.toPercentage())})',
+        fullReportBangla: _buildReport(s, totalLand, allocatedDec),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('আনা-গণ্ডা হিসাব হিস্ট্রিতে সংরক্ষিত হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
   void _recomputeReverse() {
     final val = double.tryParse(_reverseDecimalCtrl.text) ?? 0.0;
     if (val > 0) {
@@ -56,15 +100,54 @@ class _AnaGondaConverterScreenState extends State<AnaGondaConverterScreen> {
     final totalLand = double.tryParse(_totalLandCtrl.text) ?? 100.0;
     final allocatedDec = s.calculateLand(totalLand);
     final allocatedSqFt = allocatedDec * 435.60;
+    final hasOverflowInput = s.ana > 16 || s.gonda >= 20 || s.kora >= 4 || s.kranti >= 3 || s.til >= 20 || s.toFraction() > 1.0001;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('আনা-গণ্ডা কনভার্টার (প্রথাগত একক)'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'হিস্ট্রিতে সেভ',
+            onPressed: () => _saveToHistory(s, totalLand, allocatedDec),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy),
+            tooltip: 'রিপোর্ট কপি',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: _buildReport(s, totalLand, allocatedDec)));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('আনা-গণ্ডা রিপোর্ট কপি করা হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            if (hasOverflowInput)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFDAD6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: AppColors.accentCrimson, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'সতর্কতা: প্রথাগত মান সীমা (আনা ≤১৬, গণ্ডা ≤১৯, কড়া ≤৩, ক্রান্তি ≤২, তিল ≤১৯) বা মোট ১৬ আনা অতিক্রম করেছে।',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF93000A)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Traditional Symbol Display Card
             Card(
               color: AppColors.primaryGreenLight,

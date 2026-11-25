@@ -7,8 +7,10 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
 import '../../../core/utils/pdf_report_helper.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class MemoRecord {
   final String id;
@@ -121,6 +123,17 @@ class _SurveyorMemoScreenState extends State<SurveyorMemoScreen> {
     _loadMemos();
   }
 
+  @override
+  void dispose() {
+    _clientCtrl.dispose();
+    _phoneCtrl.dispose();
+    _mouzaCtrl.dispose();
+    _dagCtrl.dispose();
+    _totalFeeCtrl.dispose();
+    _advanceCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadMemos() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -229,6 +242,17 @@ BDLandPro - বাংলাদেশ ভূমি জরিপ ও সার্�
       );
     });
     await _persistMemos();
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'memo_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'সার্ভেয়ার মেমো: ${_clientCtrl.text.trim()}',
+        category: 'মৌজা ম্যাপ',
+        timestamp: DateTime.now(),
+        inputSummary: '${_mouzaCtrl.text.trim()} (দাগ ${_dagCtrl.text.trim()}) | $_serviceType',
+        resultSummary: 'মোট: ৳${total.toStringAsFixed(0)} | বকেয়া: ৳${(total - advance).toStringAsFixed(0)}',
+        fullReportBangla: _generateMemoText(),
+      ),
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

@@ -165,10 +165,14 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
             ),
           ),
 
-          // Interactive Pantograph Split Canvas with LayoutBuilder
+          // Interactive Pantograph Split Canvas with Pinch-Zoom & Wipe
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
+            child: InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 5.0,
+              boundaryMargin: const EdgeInsets.all(60),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
                 final canvasW = constraints.maxWidth > 0 ? constraints.maxWidth : 360.0;
                 return GestureDetector(
                   onHorizontalDragUpdate: (details) {
@@ -249,6 +253,7 @@ class _ComparativePantographScreenState extends State<ComparativePantographScree
                   ),
                 );
               },
+              ),
             ),
           ),
 

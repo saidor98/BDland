@@ -63,6 +63,7 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
   bool _isZoomPanMode = false;
   bool _dragSnapshotSaved = false;
   double _canvasZoom = 1.0;
+  Size _lastViewportSize = const Size(360, 480);
 
   // Real device GPS reading for Mouza reference dialog
   DeviceLocationResult? _lastGpsResult;
@@ -679,15 +680,18 @@ class _MouzaMapSimpleScreenState extends State<MouzaMapSimpleScreen> {
 
   void _addNewPointAtCenter() {
     _pushUndo();
-    final center = _measuredPoints.reduce((a, b) => a + b) / _measuredPoints.length.toDouble();
-    final newPt = center + const Offset(30, 30);
+    final viewportCenter = Offset(_lastViewportSize.width / 2.0, _lastViewportSize.height / 2.0);
+    final scenePt = _transformationController.toScene(viewportCenter);
+    final newPt = scenePt.dx.isFinite && scenePt.dy.isFinite
+        ? scenePt
+        : (_measuredPoints.reduce((a, b) => a + b) / _measuredPoints.length.toDouble() + const Offset(20, 20));
     setState(() {
       _measuredPoints.add(newPt);
       _recompute();
     });
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('নতুন CAD শীর্ষবিন্দু যোগ করা হয়েছে। ড্র্যাগ করে অবস্থান পরিবর্তন করুন।')),
+      const SnackBar(content: Text('নতুন CAD শীর্ষবিন্দু বর্তমান জুম কেন্দ্রে যোগ করা হয়েছে।')),
     );
   }
 
@@ -2653,6 +2657,7 @@ $coords
         cutLineP1: _cutLineP1,
         cutLineP2: _cutLineP2,
         targetCutDecimals: _targetCutDecimals,
+        canvasZoom: _canvasZoom,
       ),
       size: Size.infinite,
     );
@@ -2920,6 +2925,7 @@ $coords
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+                _lastViewportSize = canvasSize;
                 final transformedSceneTouch = _touchPosition != null
                     ? MatrixUtils.transformPoint(_transformationController.value, _touchPosition!)
                     : null;
@@ -2933,6 +2939,12 @@ $coords
                       boundaryMargin: const EdgeInsets.all(400),
                       panEnabled: _isZoomPanMode,
                       scaleEnabled: _isZoomPanMode,
+                      onInteractionUpdate: (_) {
+                        final nextScale = _transformationController.value.getMaxScaleOnAxis();
+                        if ((nextScale - _canvasZoom).abs() > 0.02) {
+                          setState(() => _canvasZoom = nextScale);
+                        }
+                      },
                       onInteractionEnd: (_) {
                         setState(() {
                           _canvasZoom = _transformationController.value.getMaxScaleOnAxis();
@@ -3222,6 +3234,7 @@ class _CadInteractivePainter extends CustomPainter {
   final Offset? cutLineP1;
   final Offset? cutLineP2;
   final double targetCutDecimals;
+  final double canvasZoom;
 
   _CadInteractivePainter({
     required this.points,
@@ -3233,19 +3246,22 @@ class _CadInteractivePainter extends CustomPainter {
     this.cutLineP1,
     this.cutLineP2,
     this.targetCutDecimals = 5.0,
+    this.canvasZoom = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    final inv = 1.0 / canvasZoom.clamp(0.8, 8.0);
+
     // 1. Draw Dot Matrix Grid
     final dotPaint = Paint()
-      ..color = (highContrast ? Colors.grey.shade400 : const Color(0xFF334155)).withOpacity(0.35)
+      ..color = (highContrast ? Colors.grey.shade400 : const Color(0xFF334155)).withValues(alpha: 0.35)
       ..style = PaintingStyle.fill;
 
     const gridGap = 24.0;
     for (double x = 0; x < size.width; x += gridGap) {
       for (double y = 0; y < size.height; y += gridGap) {
-        canvas.drawCircle(Offset(x, y), 1.0, dotPaint);
+        canvas.drawCircle(Offset(x, y), 1.0 * inv, dotPaint);
       }
     }
 
@@ -3259,18 +3275,18 @@ class _CadInteractivePainter extends CustomPainter {
     path.close();
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF06B6D4).withOpacity(0.08)
+      ..color = const Color(0xFF06B6D4).withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
-    // 3. Draw Polygon Stroke (Cyan #22D3EE as in Image 3)
+    // 3. Draw Polygon Stroke (Zoom-compensated razor-sharp line)
     final strokePaint = Paint()
       ..color = const Color(0xFF22D3EE)
-      ..strokeWidth = 2.5
+      ..strokeWidth = 2.2 * inv
       ..style = PaintingStyle.stroke;
     canvas.drawPath(path, strokePaint);
 
-    // 4. Draw Side Dimension Badges (feet tags along sides, yellow on black)
+    // 4. Draw Side Dimension Badges (Zoom-compensated so labels stay compact at 8.0x)
     if (showDimensions && points.length >= 2) {
       for (int i = 0; i < points.length; i++) {
         final p1 = points[i];
@@ -3281,20 +3297,19 @@ class _CadInteractivePainter extends CustomPainter {
 
         final textSpan = TextSpan(
           text: '${BanglaFormatter.formatNumber(distFt, fractionDigits: 1)}\'',
-          style: const TextStyle(
-            color: Color(0xFFFDE047), // Yellow text on dark badge (Image 3)
-            fontSize: 10.5,
+          style: TextStyle(
+            color: const Color(0xFFFDE047),
+            fontSize: 10.5 * inv,
             fontWeight: FontWeight.bold,
           ),
         );
         final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
 
-        // Draw dark badge background for clarity
         final badgeRect = RRect.fromRectAndRadius(
-          Rect.fromCenter(center: mid, width: tp.width + 10, height: tp.height + 4),
-          const Radius.circular(4),
+          Rect.fromCenter(center: mid, width: tp.width + 8.0 * inv, height: tp.height + 3.0 * inv),
+          Radius.circular(3.5 * inv),
         );
-        canvas.drawRRect(badgeRect, Paint()..color = const Color(0xFF000000).withOpacity(0.85));
+        canvas.drawRRect(badgeRect, Paint()..color = const Color(0xFF000000).withValues(alpha: 0.85));
         tp.paint(canvas, mid - Offset(tp.width / 2, tp.height / 2));
       }
     }
@@ -3302,53 +3317,61 @@ class _CadInteractivePainter extends CustomPainter {
     // 5. Draw Auto-Division Cut Line if active
     if (showDivisionCutLine && cutLineP1 != null && cutLineP2 != null) {
       final cutPaint = Paint()
-        ..color = const Color(0xFFF59E0B) // Amber/orange cutline
-        ..strokeWidth = 2.0
+        ..color = const Color(0xFFF59E0B)
+        ..strokeWidth = 2.0 * inv
         ..style = PaintingStyle.stroke;
 
-      // Draw dashed line
       final pA = cutLineP1!;
       final pB = cutLineP2!;
       final totalDist = (pB - pA).distance;
-      const dashWidth = 6.0;
-      const dashSpace = 4.0;
+      final dashWidth = 6.0 * inv;
+      final dashSpace = 4.0 * inv;
       double currentDist = 0.0;
 
-      while (currentDist < totalDist) {
+      while (currentDist < totalDist && totalDist > 0) {
         final start = Offset.lerp(pA, pB, currentDist / totalDist)!;
         final end = Offset.lerp(pA, pB, math.min(1.0, (currentDist + dashWidth) / totalDist))!;
         canvas.drawLine(start, end, cutPaint);
         currentDist += dashWidth + dashSpace;
       }
 
-      // Draw Cut-Line Badge
       final midCut = Offset((pA.dx + pB.dx) / 2, (pA.dy + pB.dy) / 2);
       final cutSpan = TextSpan(
         text: 'কাটলাইন: ${BanglaFormatter.formatNumber(targetCutDecimals, fractionDigits: 1)} শতক',
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 10,
+          fontSize: 10.0 * inv,
           fontWeight: FontWeight.bold,
         ),
       );
       final tpCut = TextPainter(text: cutSpan, textDirection: TextDirection.ltr)..layout();
       final cutRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: midCut, width: tpCut.width + 12, height: tpCut.height + 4),
-        const Radius.circular(4),
+        Rect.fromCenter(center: midCut, width: tpCut.width + 10.0 * inv, height: tpCut.height + 4.0 * inv),
+        Radius.circular(3.5 * inv),
       );
       canvas.drawRRect(cutRect, Paint()..color = const Color(0xFFD97706));
       tpCut.paint(canvas, midCut - Offset(tpCut.width / 2, tpCut.height / 2));
     }
 
-    // 6. Draw Vertices and Angles (Degrees e.g. ৯৮°, ৯৭°, ৮৭°, ৭৮°)
+    // 6. Draw Precision Crosshair Pins and Angles (stays crisp & tiny at 8.0x zoom)
+    final crossPaint = Paint()
+      ..color = const Color(0xFF004126)
+      ..strokeWidth = 1.4 * inv
+      ..style = PaintingStyle.stroke;
+    final pinOuterPaint = Paint()
+      ..color = const Color(0xFF22D3EE)
+      ..strokeWidth = 1.8 * inv
+      ..style = PaintingStyle.stroke;
+
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
 
-      // Draw vertex handle circle (Cyan outer ring + pure white center)
-      canvas.drawCircle(pt, 7.0, Paint()..color = const Color(0xFF22D3EE));
-      canvas.drawCircle(pt, 4.0, Paint()..color = Colors.white);
+      canvas.drawCircle(pt, 5.5 * inv, Paint()..color = Colors.white.withValues(alpha: 0.92));
+      canvas.drawCircle(pt, 5.5 * inv, pinOuterPaint);
+      canvas.drawLine(pt + Offset(-7.5 * inv, 0), pt + Offset(7.5 * inv, 0), crossPaint);
+      canvas.drawLine(pt + Offset(0, -7.5 * inv), pt + Offset(0, 7.5 * inv), crossPaint);
+      canvas.drawCircle(pt, 1.8 * inv, Paint()..color = const Color(0xFFBA1A1A));
 
-      // Angle readout
       if (showAngles && points.length >= 3) {
         final prev = points[(i - 1 + points.length) % points.length];
         final next = points[(i + 1) % points.length];
@@ -3360,14 +3383,15 @@ class _CadInteractivePainter extends CustomPainter {
 
         final angleSpan = TextSpan(
           text: '${BanglaNumerals.toBangla(angleDeg.round())}°',
-          style: const TextStyle(
-            color: Color(0xFF86EFAC), // Mint green angle degree text (Image 3)
-            fontSize: 11,
+          style: TextStyle(
+            color: const Color(0xFF86EFAC),
+            fontSize: 10.5 * inv,
             fontWeight: FontWeight.bold,
+            backgroundColor: Colors.black.withValues(alpha: 0.65),
           ),
         );
         final tpAngle = TextPainter(text: angleSpan, textDirection: TextDirection.ltr)..layout();
-        tpAngle.paint(canvas, pt + const Offset(-10, -22));
+        tpAngle.paint(canvas, pt + Offset(-10.0 * inv, -19.0 * inv));
       }
     }
   }

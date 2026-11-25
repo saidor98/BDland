@@ -63,23 +63,23 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.surfaceLight,
         elevation: 1.5,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: AppColors.textPrimary.withValues(alpha: 0.06),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.cardBorderLight, width: 1),
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: AppColors.surfaceContainerHigh.withValues(alpha: 0.7), width: 0.8),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: AppColors.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.cardBorderLight),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: AppColors.surfaceContainerHigh),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.cardBorderLight),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: AppColors.surfaceContainerHigh),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

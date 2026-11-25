@@ -25,8 +25,8 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
   double _scale = 1.0;
   Offset _panOffset = Offset.zero;
 
-  // Selected overlay source: null = vector demo grid, asset path, or local device path
-  String? _selectedSheetAsset;
+  // Selected overlay source: defaults to authentic scanned Mouza sheet; null = vector demo grid
+  String? _selectedSheetAsset = 'assets/mouza_maps/sample_mouza_sheet_1.jpg';
   bool _moveSheetMode = true; // true = drag moves Mouza sheet, false = drag moves underlying satellite map
 
   Future<void> _pickDeviceSheet() async {
@@ -170,7 +170,7 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                   initialCenter: const LatLngPoint(23.6472, 90.6015), // Sonargaon Aminpur Mouza
                   initialZoom: 16.5,
                   showControls: true,
-                  showLayerTag: true,
+                  showLayerTag: false,
                   showZoomButtons: true,
                   overlayChild: LayoutBuilder(
                     builder: (context, constraints) {
@@ -214,48 +214,55 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
                   ),
                 ),
 
-                // Top Notification Badge
+                // Top Notification Badge (Constrained away from top-right layer/jump FABs)
                 Positioned(
                   top: 12,
                   left: 12,
+                  right: 118,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xE00F172A),
+                      color: const Color(0xE6004126),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF0284C7), width: 1.2),
+                      border: Border.all(color: const Color(0xFFFFC64D), width: 1.0),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.layers, color: Color(0xFF38BDF8), size: 14),
-                        SizedBox(width: 6),
-                        Text(
-                          'মৌজা: আমিনপুর (জে.এল. ৩৪) | Mapbox ও ESRI স্যাটেলাইট',
-                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        const Icon(Icons.layers, color: Color(0xFFFFDEA3), size: 14),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'মৌজা: আমিনপুর (জে.এল. ৩৪) • $_rotation°',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                // Compass & Alignment HUD
+                // Compass & Alignment HUD (Positioned cleanly below Top-Right Map FABs)
                 Positioned(
-                  top: 50,
+                  top: 66,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xB3000000),
+                      color: const Color(0xD9131B2E),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.white24),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.navigation, color: Colors.redAccent, size: 24),
+                        Transform.rotate(
+                          angle: (_rotation * math.pi) / 180.0,
+                          child: const Icon(Icons.navigation, color: Color(0xFFFFC64D), size: 22),
+                        ),
                         const SizedBox(height: 2),
-                        Text('${BanglaNumerals.toBangla(_rotation.toInt())}°', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                        Text('${BanglaNumerals.toBangla(_rotation.toInt())}°', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -264,54 +271,54 @@ class _MouzaMapOverlayScreenState extends State<MouzaMapOverlayScreen> {
             ),
           ),
 
-          // Control Sliders Panel
+          // Control Sliders Panel (Stitch Porcelain Surface)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+              color: Color(0xFFFAF8FF),
+              border: Border(top: BorderSide(color: Color(0xFFD2D9F4))),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6, bottom: 6),
-                        child: ActionChip(
-                          avatar: Icon(_moveSheetMode ? Icons.open_with : Icons.lock, size: 15, color: Colors.white),
-                          label: Text(
-                            _moveSheetMode ? 'শিট সরান' : 'ম্যাপ সরান (লক)',
-                            style: const TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                          backgroundColor: _moveSheetMode ? const Color(0xFF0284C7) : const Color(0xFFD97706),
-                          onPressed: () => setState(() => _moveSheetMode = !_moveSheetMode),
-                        ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ActionChip(
+                      avatar: Icon(_moveSheetMode ? Icons.open_with : Icons.lock, size: 14, color: Colors.white),
+                      label: Text(
+                        _moveSheetMode ? 'শিট সরান' : 'ম্যাপ সরান (লক)',
+                        style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6, bottom: 6),
-                        child: ActionChip(
-                          avatar: const Icon(Icons.folder_open, size: 15),
-                          label: const Text('ফোন থেকে ফাইল', style: TextStyle(fontSize: 11.5)),
-                          onPressed: _pickDeviceSheet,
+                      backgroundColor: _moveSheetMode ? AppColors.primaryContainer : AppColors.secondaryGoldDark,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _moveSheetMode = !_moveSheetMode),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.folder_open, size: 14, color: AppColors.primaryGreen),
+                      label: const Text('ফোন থেকে ফাইল', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      backgroundColor: const Color(0xFFEAEDFF),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _pickDeviceSheet,
+                    ),
+                    ..._sheetOptions.map((opt) {
+                      final isSel = _selectedSheetAsset == opt['asset'];
+                      return ChoiceChip(
+                        label: Text(
+                          opt['label']!,
+                          style: TextStyle(fontSize: 11, color: isSel ? Colors.white : AppColors.textPrimary),
                         ),
-                      ),
-                      ..._sheetOptions.map((opt) {
-                        final isSel = _selectedSheetAsset == opt['asset'];
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6, bottom: 6),
-                          child: ChoiceChip(
-                            label: Text(opt['label']!, style: TextStyle(fontSize: 11.5, color: isSel ? Colors.white : Colors.black87)),
-                            selected: isSel,
-                            selectedColor: AppColors.primaryGreen,
-                            onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                        selected: isSel,
+                        selectedColor: AppColors.primaryGreen,
+                        backgroundColor: const Color(0xFFEAEDFF),
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (_) => setState(() => _selectedSheetAsset = opt['asset']),
+                      );
+                    }),
+                  ],
                 ),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     const Icon(Icons.opacity, size: 20, color: AppColors.primaryGreen),

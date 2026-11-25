@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
+import '../../../core/services/history_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../history/models/calculation_history_item.dart';
 
 class SharerRatioItem {
   final String name;
@@ -27,40 +29,63 @@ class _LandRatioDividerScreenState extends State<LandRatioDividerScreen> {
     const SharerRatioItem(name: 'অংশীদার ৩ (গ)', ratioWeight: 2.0),
   ];
 
-  void _addSharer() {
-    final nameCtrl = TextEditingController(text: 'অংশীদার ${_sharers.length + 1}');
-    final ratioCtrl = TextEditingController(text: '1.0');
+  @override
+  void dispose() {
+    _totalLandDecCtrl.dispose();
+    _totalFrontageFtCtrl.dispose();
+    super.dispose();
+  }
+
+  void _addOrEditSharer({int? editIndex}) {
+    final existing = editIndex != null ? _sharers[editIndex] : null;
+    final nameCtrl = TextEditingController(text: existing?.name ?? 'অংশীদার ${_sharers.length + 1}');
+    final ratioCtrl = TextEditingController(text: existing != null ? existing.ratioWeight.toString() : '1.0');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('নতুন অংশীদার যোগ করুন'),
+        title: Text(editIndex == null ? 'নতুন অংশীদার যোগ করুন' : 'অংশীদারের অনুপাত সংশোধন'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'নাম')),
             const SizedBox(height: 10),
-            TextField(controller: ratioCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'অনুপাত / ইনভেস্টমেন্ট')),
+            TextField(
+              controller: ratioCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'অনুপাত / ইনভেস্টমেন্ট (> ০)'),
+            ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
           ElevatedButton(
             onPressed: () {
-              final r = double.tryParse(ratioCtrl.text) ?? 1.0;
+              final r = double.tryParse(ratioCtrl.text.trim()) ?? 0.0;
+              if (r <= 0 || !r.isFinite) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('অনুপাত অবশ্যই শূন্যের চেয়ে বড় সংখ্যা হতে হবে।'), backgroundColor: AppColors.accentCrimson),
+                );
+                return;
+              }
+              final item = SharerRatioItem(name: nameCtrl.text.trim().isEmpty ? 'অংশীদার' : nameCtrl.text.trim(), ratioWeight: r);
               setState(() {
-                _sharers.add(SharerRatioItem(name: nameCtrl.text.trim(), ratioWeight: r));
+                if (editIndex == null) {
+                  _sharers.add(item);
+                } else {
+                  _sharers[editIndex] = item;
+                }
               });
               Navigator.pop(ctx);
             },
-            child: const Text('যোগ করুন'),
+            child: Text(editIndex == null ? 'যোগ করুন' : 'আপডেট'),
           ),
         ],
       ),
     );
   }
 
-  void _copyReport() {
+  String _generateReportText() {
     final totalLand = double.tryParse(_totalLandDecCtrl.text) ?? 0;
     final totalFront = double.tryParse(_totalFrontageFtCtrl.text) ?? 0;
     final sumRatio = _sharers.fold<double>(0, (sum, item) => sum + item.ratioWeight);
@@ -81,9 +106,32 @@ class _LandRatioDividerScreenState extends State<LandRatioDividerScreen> {
       buffer.writeln('   রাস্তার মুখ: ${BanglaFormatter.formatNumber(front.toDouble())} ফুট\n');
     }
     buffer.writeln('অ্যাপ: BDLandPro - পেশাদার বাংলাদেশ ভূমি জরিপ');
+    return buffer.toString();
+  }
 
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
+  void _copyReport() {
+    Clipboard.setData(ClipboardData(text: _generateReportText()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('অনুপাত বণ্টন রিপোর্ট কপি করা হয়েছে!')));
+  }
+
+  Future<void> _saveToHistory() async {
+    final totalLand = double.tryParse(_totalLandDecCtrl.text) ?? 0;
+    final totalFront = double.tryParse(_totalFrontageFtCtrl.text) ?? 0;
+    await HistoryService.instance.saveItem(
+      CalculationHistoryItem(
+        id: 'ratio_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'অনুপাত বণ্টন (${BanglaFormatter.formatNumber(totalLand)} শতক)',
+        category: 'খতিয়ান',
+        timestamp: DateTime.now(),
+        inputSummary: 'ফ্রন্টেজ: ${BanglaFormatter.formatNumber(totalFront)} ফুট | ${BanglaNumerals.toBangla(_sharers.length)} অংশীদার',
+        resultSummary: _sharers.map((e) => e.name).join(', '),
+        fullReportBangla: _generateReportText(),
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('অনুপাত বণ্টন হিস্ট্রিতে সংরক্ষিত হয়েছে!'), backgroundColor: AppColors.primaryGreen),
+    );
   }
 
   @override
@@ -96,6 +144,7 @@ class _LandRatioDividerScreenState extends State<LandRatioDividerScreen> {
       appBar: AppBar(
         title: const Text('অনুপাত ও ফ্রন্টেজ ক্যালকুলেটর'),
         actions: [
+          IconButton(icon: const Icon(Icons.bookmark_add_outlined), tooltip: 'হিস্ট্রিতে সেভ', onPressed: _saveToHistory),
           IconButton(icon: const Icon(Icons.copy), tooltip: 'কপি রিপোর্ট', onPressed: _copyReport),
         ],
       ),
@@ -142,7 +191,7 @@ class _LandRatioDividerScreenState extends State<LandRatioDividerScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('অংশীদারগণের অনুপাত তালিকা', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        IconButton.filledTonal(onPressed: _addSharer, icon: const Icon(Icons.person_add, size: 20)),
+                        IconButton.filledTonal(onPressed: () => _addOrEditSharer(), icon: const Icon(Icons.person_add, size: 20)),
                       ],
                     ),
                     const Divider(height: 16),
@@ -166,7 +215,14 @@ class _LandRatioDividerScreenState extends State<LandRatioDividerScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('${BanglaNumerals.toBangla(idx + 1)}. ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                Expanded(
+                                  child: Text('${BanglaNumerals.toBangla(idx + 1)}. ${s.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, color: AppColors.primaryGreen, size: 18),
+                                  tooltip: 'সম্পাদনা',
+                                  onPressed: () => _addOrEditSharer(editIndex: idx),
+                                ),
                                 if (_sharers.length > 1)
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, color: AppColors.accentCrimson, size: 18),

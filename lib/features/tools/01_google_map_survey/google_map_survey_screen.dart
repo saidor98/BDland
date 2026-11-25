@@ -3,10 +3,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/utils/bangla_formatter.dart';
+import '../../../core/utils/pdf_report_helper.dart';
 import '../../../core/services/history_service.dart';
 import '../../../core/utils/polygon_geometry.dart';
 import '../../history/models/calculation_history_item.dart';
@@ -911,6 +915,66 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
     return buffer.toString();
   }
 
+  Future<void> _exportPdf() async {
+    final theme = await PdfReportHelper.loadBengaliTheme();
+    final pdf = pw.Document(theme: theme);
+    final decimal = _areaSqFt / 435.60;
+    final katha = _areaSqFt / 720.00;
+    final bigha = decimal / 33.0;
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'BDLandPro স্যাটেলাইট ও GPS ভূমি জরিপ প্রত্যয়নপত্র',
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'তারিখ: ${BanglaFormatter.formatDateTime(DateTime.now())} | পয়েন্ট: ${BanglaNumerals.toBangla(_surveyPoints.length)} টি (WGS84)',
+                style: const pw.TextStyle(fontSize: 11),
+              ),
+              pw.Divider(thickness: 1.5),
+              pw.SizedBox(height: 10),
+              pw.Text('মোট জমি: ${BanglaFormatter.formatNumber(decimal, fractionDigits: 3)} শতক (${BanglaFormatter.formatNumber(katha, fractionDigits: 2)} কাঠা | ${BanglaFormatter.formatNumber(bigha, fractionDigits: 3)} বিঘা)', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              pw.Text('বর্গফুট: ${BanglaFormatter.formatNumber(_areaSqFt, fractionDigits: 2)} sq ft | পরিসীমা: ${BanglaFormatter.formatNumber(_perimeterFt, fractionDigits: 1)} ফুট', style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 12),
+              pw.Text('জরিপকৃত সীমানা ওয়েপয়েন্ট (WGS84):', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              pw.TableHelper.fromTextArray(
+                headers: ['#', 'অক্ষাংশ (Latitude)', 'দ্রাঘিমাংশ (Longitude)'],
+                data: _surveyPoints.asMap().entries.map((e) => [
+                  'পিন ${BanglaNumerals.toBangla(e.key + 1)}',
+                  e.value.latitude.toStringAsFixed(6),
+                  e.value.longitude.toStringAsFixed(6),
+                ]).toList(),
+              ),
+              pw.Spacer(),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('ইঞ্জিন: ESRI / Mapbox GeoDesic WGS84'),
+                  pw.Text('সার্ভেয়ারের স্বাক্ষর: _______________'),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: 'BDLandPro_GPS_Survey_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
+  }
+
   void _copyReport() {
     Clipboard.setData(ClipboardData(text: _generateReport()));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -966,6 +1030,11 @@ class _GoogleMapSurveyScreenState extends State<GoogleMapSurveyScreen> {
             icon: const Icon(Icons.list_alt),
             tooltip: 'জিপিএস পয়েন্ট তালিকা',
             onPressed: _surveyPoints.isNotEmpty ? _showGpsWaypointsDialog : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'A4 PDF প্রত্যয়ন',
+            onPressed: _surveyPoints.length >= 3 ? _exportPdf : null,
           ),
           IconButton(
             icon: const Icon(Icons.share_location),
