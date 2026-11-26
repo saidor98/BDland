@@ -26,6 +26,7 @@ import '../../tools/21_tofsil_partition/tofsil_partition_screen.dart';
 import '../../tools/22_print_studio/print_studio_screen.dart';
 import '../../tools/23_survey_formulas/land_survey_formulas_screen.dart';
 import '../../tools/24_surveyor_memo/surveyor_memo_screen.dart';
+import '../../tools/25_name_share_calculator/name_share_calculator_screen.dart';
 
 class ToolsData {
   ToolsData._();
@@ -270,6 +271,16 @@ class ToolsData {
       badgeText: 'নতুন',
       screenBuilder: (ctx) => const SurveyorMemoScreen(),
       keywords: ['মেমো', 'বিল', 'ভাউচার', 'সার্ভেয়ার', 'memo', 'invoice', 'খরচ'],
+    ),
+    ToolItem(
+      id: 'tool_25_name_share',
+      number: 25,
+      title: 'নামের অংশ ক্যালকুলেটর',
+      subtitle: 'নাম অনুযায়ী অংশ, আনা-গণ্ডা ও জমি হিসাব',
+      icon: Icons.badge_outlined,
+      badgeText: 'নতুন',
+      screenBuilder: (ctx) => const NameShareCalculatorScreen(),
+      keywords: ['নাম', 'নামের অংশ', 'মালিক', 'অংশীদার', 'খতিয়ান', 'নামজারি', 'হিস্যা', 'name share'],
     ),
   ];
 }

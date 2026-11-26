@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/bangla_numerals.dart';
 import '../../../core/services/pinned_tools_service.dart';
 import '../../history/screens/history_screen.dart';
 import '../data/tools_data.dart';
@@ -117,7 +118,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             Divider(),
             Text('• সংস্করণ: ১.০.০ (ওপেন সোর্স)'),
             SizedBox(height: 4),
-            Text('• সকল ২৪টি টুল আনলকড ও অফলাইন প্রস্তুত'),
+            Text('• সকল ২৫টি টুল আনলকড ও অফলাইন প্রস্তুত'),
             SizedBox(height: 4),
             Text('• ডেটা স্টোরেজ: লোকাল ডিভাইস এনক্রিপ্টেড'),
           ],
@@ -468,13 +469,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           if (_topTabIndex == 0 && _searchQuery.trim().isEmpty) ...[
             _buildStitchHeroDeck(width >= 650),
             const SizedBox(height: 16),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.engineering, size: 17, color: AppColors.primaryGreen),
-                SizedBox(width: 6),
+                const Icon(Icons.engineering, size: 17, color: AppColors.primaryGreen),
+                const SizedBox(width: 6),
                 Text(
-                  'সকল ২৪টি প্রফেশনাল জরিপ টুলস',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  'সকল ${BanglaNumerals.toBangla(ToolsData.allTools.length)}টি প্রফেশনাল জরিপ টুলস',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                 ),
               ],
             ),
